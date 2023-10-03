@@ -1,0 +1,121 @@
+use dep::aztec::note::{
+    note_header::NoteHeader,
+    note_interface::NoteInterface,
+    utils::compute_note_hash_for_read_or_nullify,
+};
+use dep::aztec::oracle::{
+    get_secret_key::get_secret_key,
+    get_public_key::get_public_key,
+};
+
+use dep::aztec::types::point::Point;
+
+/// @member request: the question asked
+/// @member requester_address: the address of the requester
+/// @member requester_pk: the public key of the requester
+/// @member divinity_address: the address of the divinity
+/// @member shared_nullifier_key: the shared nullifier key (a random value existing in both the divinity and the requester set of notes)
+/// @member header: the note header
+struct QuestionNote {
+    request: Field,
+    requester_address: Field,
+    requester_pk: Point, // when adding to the divinity notes, divinity cannot know the PK (and therefore cannot register it in the RPC) - remove this when/if PK are broadcasted in a way
+    divinity_address: Field,
+    shared_nullifier_key: Field,
+    header: NoteHeader
+}
+
+global QUESTION_NOTE_LEN: Field = 6; // requester PK points takes 2 elements for its coordinates
+
+impl QuestionNote {
+    fn new( _request: Field,
+            _requesterAddress: Field,
+            _divinityAddress: Field,
+            _sharedNullifierKey: Field
+        ) -> Self {
+
+        QuestionNote {
+            request: _request,
+            requester_address: _requesterAddress,
+            requester_pk: get_public_key(_requesterAddress), // Requester is sender -> PK is in its RPC; if we change this, need to register PK in RPC upfront
+            divinity_address: _divinityAddress,
+            shared_nullifier_key: _sharedNullifierKey,
+            header: NoteHeader::empty(),
+        }
+
+    }
+
+    fn serialize(self) -> [Field; QUESTION_NOTE_LEN] {
+        [self.request, self.requester_address, self.requester_pk.x, self.requester_pk.y, self.divinity_address, self.shared_nullifier_key]
+    }
+
+    fn deserialize(preimage: [Field; QUESTION_NOTE_LEN]) -> Self {
+        QuestionNote {
+            request: preimage[0],
+            requester_address: preimage[1],
+            requester_pk: Point{
+                x: preimage[2],
+                y: preimage[3]},
+            divinity_address: preimage[4],
+            shared_nullifier_key: preimage[5], 
+            header: NoteHeader::empty(),
+        }
+    }
+
+    fn compute_note_hash(self) -> Field {
+        dep::std::hash::pedersen(serialize(self))[0]
+    }
+
+
+    // 
+    fn compute_nullifier(self) -> Field {
+
+        let note_hash_for_nullify = compute_note_hash_for_read_or_nullify(QuestionNoteMethods, self);
+        let requester_pub_key = self.requester_pk;
+        let nullifier_key = self.shared_nullifier_key;
+
+        dep::std::hash::pedersen([
+            note_hash_for_nullify,
+            requester_pub_key.x,
+            requester_pub_key.y,
+            nullifier_key,
+        ])[0]
+    }
+
+    fn set_header(&mut self, header: NoteHeader) {
+        self.header = header;
+    }
+}
+
+fn deserialize(preimage: [Field; QUESTION_NOTE_LEN]) -> QuestionNote {
+    QuestionNote::deserialize(preimage)
+}
+
+fn serialize(note: QuestionNote) -> [Field; QUESTION_NOTE_LEN] {
+    note.serialize()
+}
+
+fn compute_note_hash(note: QuestionNote) -> Field {
+    note.compute_note_hash()
+}
+
+fn compute_nullifier(note: QuestionNote) -> Field {
+    note.compute_nullifier()
+}
+
+fn get_header(note: QuestionNote) -> NoteHeader {
+    note.header
+}
+
+fn set_header(note: &mut QuestionNote, header: NoteHeader) {
+    note.set_header(header)
+}
+
+global QuestionNoteMethods = NoteInterface {
+    deserialize,
+    serialize,
+    compute_note_hash,
+    compute_nullifier,
+    get_header,
+    set_header,
+};

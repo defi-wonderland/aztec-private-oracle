@@ -1,0 +1,9 @@
+[package]
+name = "privateoracle"
+type = "contract"
+authors = ["wonderland"]
+compiler_version = "0.9.0"
+
+[dependencies]
+aztec = {path = "./node_modules/aztec-packages/yarn-project/aztec-nr/aztec"}
+value_note = {path = "./node_modules/aztec-packages/yarn-project/aztec-nr/value-note"}

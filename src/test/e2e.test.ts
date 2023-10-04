@@ -13,7 +13,7 @@ import {
   getSandboxAccountsWallets,
   waitForSandbox,
 } from "@aztec/aztec.js";
-import { toBigIntBE } from "@aztec/foundation/bigint-buffer";
+import { toBigIntBE } from "@aztec/foundation/dest/bigint-buffer";
 
 const {
   SANDBOX_URL = "http://localhost:8080",

@@ -13,9 +13,13 @@ import {
   getSandboxAccountsWallets,
   waitForSandbox,
 } from "@aztec/aztec.js";
-import { toBigIntBE } from "@aztec/foundation/dest/bigint-buffer";
+import { toBigIntBE } from "@aztec/foundation/bigint-buffer";
 
 const {
   SANDBOX_URL = "http://localhost:8080",
   ETHEREUM_HOST = "http://localhost:8545",
 } = process.env;
+
+test('test adding two positive nums', function () {
+  expect(4 + 5).toBe(9);
+});

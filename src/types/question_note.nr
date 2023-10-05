@@ -19,13 +19,12 @@ use dep::aztec::types::point::Point;
 struct QuestionNote {
     request: Field,
     requester_address: Field,
-    requester_pk: Point, // when adding to the divinity notes, divinity cannot know the PK (and therefore cannot register it in the RPC) - remove this when/if PK are broadcasted in a way
     divinity_address: Field,
     shared_nullifier_key: Field,
     header: NoteHeader
 }
 
-global QUESTION_NOTE_LEN: Field = 6; // requester PK points takes 2 elements for its coordinates
+global QUESTION_NOTE_LEN: Field = 4; // requester PK points takes 2 elements for its coordinates
 
 impl QuestionNote {
     fn new( _request: Field,
@@ -37,7 +36,6 @@ impl QuestionNote {
         QuestionNote {
             request: _request,
             requester_address: _requesterAddress,
-            requester_pk: get_public_key(_requesterAddress), // Requester is sender -> PK is in its RPC; if we change this, need to register PK in RPC upfront
             divinity_address: _divinityAddress,
             shared_nullifier_key: _sharedNullifierKey,
             header: NoteHeader::empty(),
@@ -46,16 +44,13 @@ impl QuestionNote {
     }
 
     fn serialize(self) -> [Field; QUESTION_NOTE_LEN] {
-        [self.request, self.requester_address, self.requester_pk.x, self.requester_pk.y, self.divinity_address, self.shared_nullifier_key]
+        [self.request, self.requester_address, self.divinity_address, self.shared_nullifier_key]
     }
 
     fn deserialize(preimage: [Field; QUESTION_NOTE_LEN]) -> Self {
         QuestionNote {
             request: preimage[0],
             requester_address: preimage[1],
-            requester_pk: Point{
-                x: preimage[2],
-                y: preimage[3]},
             divinity_address: preimage[4],
             shared_nullifier_key: preimage[5], 
             header: NoteHeader::empty(),
@@ -66,18 +61,13 @@ impl QuestionNote {
         dep::std::hash::pedersen(serialize(self))[0]
     }
 
-
-    // 
     fn compute_nullifier(self) -> Field {
 
         let note_hash_for_nullify = compute_note_hash_for_read_or_nullify(QuestionNoteMethods, self);
-        let requester_pub_key = self.requester_pk;
         let nullifier_key = self.shared_nullifier_key;
 
         dep::std::hash::pedersen([
             note_hash_for_nullify,
-            requester_pub_key.x,
-            requester_pub_key.y,
             nullifier_key,
         ])[0]
     }

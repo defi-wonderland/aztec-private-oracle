@@ -144,49 +144,41 @@ contract PrivateOracle {
             .set_limit(1);
         
         // Get the question note
-        let request = storage.questions.get_notes(request_filter)[0].unwrap_unchecked();
+        let request = storage.questions.get_notes(request_filter)[0];
 
-        assert(request.request == question);
-        assert(request.divinity_address == caller);
-
-        let mut answer_to_keep = 0;
+        // Check if exists
+        assert(!request.is_none());
 
         // Check if this question was previously answered
         let answerFilter = NoteGetterOptions::new()
             .select(0, question)
             .set_limit(1);
         
-
-        let answerNote = storage.answers.get_notes(answerFilter)[0].unwrap_unchecked();
-
-        // TODO: this check might not be hit (fail before) if the note is uninit -> filter fn using is_some()?
-        // This question has already been answered?
-        if answerNote.answer != 0 {
-            assert(answerNote.request == question);
-            assert(answerNote.owner == caller);
-
-            // Update the answer to the preexisting one
-            answer_to_keep = answerNote.answer;
-        // If not, use the answer passed as arg
-        } else {
-            // Create a new note
-            answer_to_keep = answer;
-        }
-
-        // Store the answer in both sets (requester and oracle)
-        let mut new_answer: AnswerNote = AnswerNote::new(
+        let mut answer: AnswerNote = AnswerNote::new(
             question,
             answer,
             caller
         );
 
-        storage.answers.insert(&mut new_answer);
+        let answer_note = storage.answers.get_notes(answerFilter)[0].unwrap_unchecked();
+
+        // TODO: this check might not be hit (fail before) if the note is uninit -> filter fn using is_some()?
+        // This question has already been answered?
+        if answer_note.answer != 0 {
+            // Update the answer to the preexisting one
+            answer.answer = answer_note.answer;
+        // If not, use the answer passed as arg
+        } else {
+            // Create a new note
+            // Store the answer in the oracle set
+            storage.answers.insert(&mut answer);
+        }
 
         // Encrypt the answer in the requester notes
-        let requester_pub_key = get_public_key(request.requester_address);
+        let requester_pub_key = get_public_key(request.unwrap_unchecked().requester_address);
         let answers_storage_slot = storage.answers.storage_slot;
 
-        let encrypted = new_answer.serialize();
+        let encrypted = answer.serialize();
 
         emit_encrypted_log(
             &mut context,
@@ -200,7 +192,6 @@ contract PrivateOracle {
     // Requester consults the answer to one of their questions
     #[aztec(private)]
     fn consult_answer(question: Field) -> Field {
-
         let storage = Storage::init(Context::private(&mut context));
         let caller = context.msg_sender();
         
@@ -210,10 +201,6 @@ contract PrivateOracle {
         // filter the notes - get_notes returns the note **that the account has access to** (if not, add it to the Option)
         let answered_note = storage.answers.get_notes(answer_getter_option)[0].unwrap_unchecked();
         
-        // constrain (owner == caller and _qeustion==note.request)
-        assert(answered_note.owner == caller);
-        assert(answered_note.request == question);
-
         // Return the answer
         answered_note.answer
     }
@@ -227,10 +214,6 @@ contract PrivateOracle {
         // create the Answer_getter_option: SELECT by address and max number of requests
         let question_getter_option = NoteGetterOptions::new().select(0, question).select(1, caller).set_limit(1);
         let question_note = storage.questions.get_notes(question_getter_option)[0].unwrap_unchecked();
-
-        // Assert that the question exists and is owned by the caller
-        assert(question_note.request == question);
-        assert(question_note.requester_address == caller);
 
         // nullify the note
         storage.questions.remove(question_note);

@@ -51,6 +51,7 @@ impl AnswerNote {
 // TODO: refactor to a set of immutable singleton instead
     // No nullifier needed -> only one divinity has access to the original request and the answer cannot change ever
     fn compute_nullifier(self) -> Field {
+        assert(false);
         0
     }
 

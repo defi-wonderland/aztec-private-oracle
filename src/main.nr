@@ -63,8 +63,8 @@ contract PrivateOracle {
     use dep::aztec::state_vars::immutable_singleton::ImmutableSingleton;
     use dep::aztec::types::type_serialization::field_serialization::{ FieldSerializationMethods, FIELD_SERIALIZED_LEN};
     
-    global QUESTION_SET_SLOT = 6;
-    global ANSWER_SET_SLOT = 7;
+    global QUESTION_SET_SLOT = 1;
+    global ANSWER_SET_SLOT = 2;
 
     struct Storage {
         questions: Set<QuestionNote, QUESTION_NOTE_LEN>,
@@ -109,26 +109,38 @@ contract PrivateOracle {
         // Store the question in the requester notes and send it to the oracle notes too
         let random_nullifier_shared_key = rand();
 
-        let mut newquestion: QuestionNote = QuestionNote::new(
+        let mut new_question: QuestionNote = QuestionNote::new(
             question,
             sender, 
             divinity_address,
             random_nullifier_shared_key
         );
 
-        storage.questions.insert(&mut newquestion);
+        storage.questions.insert(&mut new_question);
+
+        let serialized = new_question.serialize();
+
+        // Encrypt the qyestion in the requester notes - todo: we might remove it later, as the requester doesn't need to access the note (only contract)
+        let requester_pub_key = get_public_key(sender);
+
+        emit_encrypted_log(
+            &mut context,
+            address_this,
+            QUESTION_SET_SLOT,
+            requester_pub_key,
+            serialized,
+        );
 
         // Encrypt the question in the divinity notes
         let divinity_pub_key = get_public_key(divinity_address);
 
-        let encrypted = newquestion.serialize();
 
         emit_encrypted_log(
             &mut context,
             address_this,
             QUESTION_SET_SLOT,
             divinity_pub_key,
-            encrypted,
+            serialized,
         ); 
     }
 

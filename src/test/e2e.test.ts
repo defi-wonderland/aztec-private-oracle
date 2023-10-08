@@ -49,16 +49,17 @@ beforeAll(async () => {
 });
 
 describe("E2E Private Oracle", () => {
-  // Deploy the oracle
-  beforeAll(async () => {
-    const deployer = await createAccount(pxe);
-
-    oracle = await PrivateOracleContract.deploy(deployer).send().deployed();
-  }, 30_000);
 
   describe("submit_question(..)", () => {
     let shared_key_nullifier_divinity: Fr;
     let shared_key_nullifier_requester: Fr;
+
+    // Deploy the oracle
+    beforeAll(async () => {
+      const deployer = await createAccount(pxe);
+
+      oracle = await PrivateOracleContract.deploy(deployer).send().deployed();
+    }, 30_000);
 
     it("Tx to submit_question is mined", async () => {
       // Submit the question
@@ -111,6 +112,55 @@ describe("E2E Private Oracle", () => {
       expect(shared_key_nullifier_divinity).toEqual(
         shared_key_nullifier_requester
       );
+    });
+  });
+
+  describe("submit_answer(..)", () => {
+    // Deploy the oracle and submit the question
+    beforeAll(async () => {
+      const deployer = await createAccount(pxe);
+
+      oracle = await PrivateOracleContract.deploy(deployer).send().deployed();
+
+      // Submit the question
+      const receipt = await oracle
+        .withWallet(requester)
+        .methods.submit_question(123, divinity.getAddress())
+        .send()
+        .wait();
+    }, 30_000);
+
+    it("Tx to submit_answer is mined", async () => {
+      // Submit the answer
+      const receipt = await oracle
+        .withWallet(divinity)
+        .methods.submit_answer(123, 456)
+        .send()
+        .wait();
+
+      expect(receipt.status).toBe("mined");
+    });
+
+    it("divinity note has the correct data", async () => {
+      const divinityNotes = await pxe.getPrivateStorageAt(
+        divinity.getAddress(),
+        oracle.address,
+        ANSWERS_SLOT
+      );
+
+      expect(divinityNotes[0].items[0].value).toEqual(123n);
+      expect(divinityNotes[0].items[1].value).toEqual(456n);
+    });
+
+    it("requester note has the correct data", async () => {
+      const requesterNotes = await pxe.getPrivateStorageAt(
+        requester.getAddress(),
+        oracle.address,
+        ANSWERS_SLOT
+      );
+
+      expect(requesterNotes[0].items[0].value).toEqual(123n);
+      expect(requesterNotes[0].items[1].value).toEqual(456n);
     });
   });
 });

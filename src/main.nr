@@ -50,7 +50,7 @@ contract PrivateOracle {
         note_interface::NoteInterface,
         note_getter_options::NoteGetterOptions,
         note_viewer_options::NoteViewerOptions,
-        utils::compute_note_hash_for_read_or_nullify,
+        utils as note_utils
     };
     use dep::aztec::oracle::{
         get_public_key::get_public_key,
@@ -62,14 +62,17 @@ contract PrivateOracle {
     use dep::aztec::state_vars::singleton::Singleton;
     use dep::aztec::state_vars::immutable_singleton::ImmutableSingleton;
     use dep::aztec::types::type_serialization::field_serialization::{ FieldSerializationMethods, FIELD_SERIALIZED_LEN};
-            
+    
+    global QUESTION_SET_SLOT = 6;
+    global ANSWER_SET_SLOT = 7;
+
     struct Storage {
+        questions: Set<QuestionNote, QUESTION_NOTE_LEN>,
+        answers: Set<AnswerNote, ANSWER_NOTE_LEN> // TODO: use a set of immutable singletons
         // payment_token: PublicState<Field, FIELD_SERIALIZED_LEN>,
         // fee: PublicState<Field, FIELD_SERIALIZED_LEN>,
         // stored_balance: PublicState<Field, FIELD_SERIALIZED_LEN>,
         // balance_of: Map<Set<ValueNote, VALUE_NOTE_LEN>>,
-        questions: Set<QuestionNote, QUESTION_NOTE_LEN>,
-        answers: Set<AnswerNote, ANSWER_NOTE_LEN> // TODO: use a set of immutable singletons
     }
 
     impl Storage {
@@ -79,9 +82,9 @@ contract PrivateOracle {
 
                 // -- Private --
                 // Set of questions
-                questions: Set::new(context, 6, QuestionNoteMethods),
+                questions: Set::new(context, QUESTION_SET_SLOT, QuestionNoteMethods),
                 // Set of answers
-                answers: Set::new(context, 7, AnswerNoteMethods)
+                answers: Set::new(context, ANSWER_SET_SLOT, AnswerNoteMethods)
             }
         }
     }
@@ -117,14 +120,13 @@ contract PrivateOracle {
 
         // Encrypt the question in the divinity notes
         let divinity_pub_key = get_public_key(divinity_address);
-        let questionsstorage_slot = storage.questions.storage_slot;
 
         let encrypted = newquestion.serialize();
 
         emit_encrypted_log(
             &mut context,
             address_this,
-            questionsstorage_slot,
+            QUESTION_SET_SLOT,
             divinity_pub_key,
             encrypted,
         ); 
@@ -176,14 +178,13 @@ contract PrivateOracle {
 
         // Encrypt the answer in the requester notes
         let requester_pub_key = get_public_key(request.unwrap_unchecked().requester_address);
-        let answers_storage_slot = storage.answers.storage_slot;
 
         let encrypted = answer.serialize();
 
         emit_encrypted_log(
             &mut context,
             caller,
-            answers_storage_slot,
+            ANSWER_SET_SLOT,
             requester_pub_key,
             encrypted,
         );
@@ -217,5 +218,17 @@ contract PrivateOracle {
 
         // nullify the note
         storage.questions.remove(question_note);
+    }
+
+    // Computes note hash and nullifier.
+    unconstrained fn compute_note_hash_and_nullifier(contract_address: Field, nonce: Field, storage_slot: Field, preimage: [Field; QUESTION_NOTE_LEN]) -> [Field; 4] {
+        let note_header = NoteHeader::new(contract_address, nonce, storage_slot);
+
+        if(storage_slot == QUESTION_SET_SLOT) {
+            note_utils::compute_note_hash_and_nullifier(QuestionNoteMethods, note_header, preimage)
+        }
+        else {
+            note_utils::compute_note_hash_and_nullifier(AnswerNoteMethods, note_header, preimage)
+        }
     }
 }

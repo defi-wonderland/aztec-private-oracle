@@ -75,6 +75,9 @@ export class PrivateOracleContract extends ContractBase {
     /** cancel_question(question: field) */
     cancel_question: ((question: FieldLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 
+    /** compute_note_hash_and_nullifier(contract_address: field, nonce: field, storage_slot: field, preimage: array) */
+    compute_note_hash_and_nullifier: ((contract_address: FieldLike, nonce: FieldLike, storage_slot: FieldLike, preimage: FieldLike[]) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
+
     /** consult_answer(question: field) */
     consult_answer: ((question: FieldLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 

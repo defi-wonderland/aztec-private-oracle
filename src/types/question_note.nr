@@ -24,7 +24,7 @@ struct QuestionNote {
     header: NoteHeader
 }
 
-global QUESTION_NOTE_LEN: Field = 4; // requester PK points takes 2 elements for its coordinates
+global QUESTION_NOTE_LEN: Field = 4;
 
 impl QuestionNote {
     fn new( _request: Field,
@@ -62,13 +62,13 @@ impl QuestionNote {
     }
 
     fn compute_nullifier(self) -> Field {
-
         let note_hash_for_nullify = compute_note_hash_for_read_or_nullify(QuestionNoteMethods, self);
         let nullifier_key = self.shared_nullifier_key;
 
         dep::std::hash::pedersen([
             note_hash_for_nullify,
             nullifier_key,
+            0
         ])[0]
     }
 

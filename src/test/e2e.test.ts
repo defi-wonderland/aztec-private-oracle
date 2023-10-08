@@ -52,8 +52,9 @@ describe("E2E Private Oracle", () => {
   }, 30_000);
 
   it("send request", async () => {
-    const receipt = await oracle.methods
-      .submit_question(123, divinity.getAddress())
+    const receipt = await oracle
+      .withWallet(requestor)
+      .methods.submit_question(123, divinity.getAddress())
       .send()
       .wait();
 

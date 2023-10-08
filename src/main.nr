@@ -145,7 +145,7 @@ contract PrivateOracle {
     }
 
 
-    // Oracle submit an answer to a given question
+    // Divinity submit an answer to a given question
     #[aztec(private)]
     fn submit_answer(question: Field, answer: Field) {
         let storage = Storage::init(Context::private(&mut context));
@@ -174,17 +174,11 @@ contract PrivateOracle {
             caller
         );
 
-        let answer_note = storage.answers.get_notes(answerFilter)[0].unwrap_unchecked();
+        let answer_note = storage.answers.get_notes(answerFilter)[0];
 
-        // TODO: this check might not be hit (fail before) if the note is uninit -> filter fn using is_some()?
-        // This question has already been answered?
-        if answer_note.answer != 0 {
-            // Update the answer to the preexisting one
-            answer.answer = answer_note.answer;
-        // If not, use the answer passed as arg
-        } else {
-            // Create a new note
-            // Store the answer in the oracle set
+        // Hasn't been answered yet (in another request)?
+        if answer_note.is_none() {
+            // Create a new note and store it in the oracle set
             storage.answers.insert(&mut answer);
 
             let encrypted = answer.serialize();
@@ -197,6 +191,9 @@ contract PrivateOracle {
                 get_public_key(caller),
                 encrypted,
             );
+        } else {
+            // Update the answer to the preexisting one
+            answer.answer = answer_note.unwrap_unchecked().answer;
         }
 
         // Encrypt the answer in the requester notes
@@ -211,6 +208,9 @@ contract PrivateOracle {
             requester_pub_key,
             encrypted,
         );
+
+        // Nullify the question note
+        storage.questions.remove(request.unwrap_unchecked());
     }
 
     // Requester consults the answer to one of their questions

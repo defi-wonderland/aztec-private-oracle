@@ -51,8 +51,8 @@ impl QuestionNote {
         QuestionNote {
             request: preimage[0],
             requester_address: preimage[1],
-            divinity_address: preimage[4],
-            shared_nullifier_key: preimage[5], 
+            divinity_address: preimage[2],
+            shared_nullifier_key: preimage[3], 
             header: NoteHeader::empty(),
         }
     }
@@ -68,7 +68,6 @@ impl QuestionNote {
         dep::std::hash::pedersen([
             note_hash_for_nullify,
             nullifier_key,
-            0
         ])[0]
     }
 

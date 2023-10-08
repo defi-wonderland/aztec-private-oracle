@@ -151,10 +151,10 @@ contract PrivateOracle {
         let storage = Storage::init(Context::private(&mut context));
         let caller = context.msg_sender();
 
-        // Filter request note to check if existing (either wrong request or already answered) and accesible for this divinity (should't happen)
+        // Filter request note to check if existing and accesible for this divinity
         let request_filter = NoteGetterOptions::new()
             .select(0, question)
-            .select(3, caller)
+            .select(2, caller)
             .set_limit(1);
         
         // Get the question note
@@ -186,6 +186,17 @@ contract PrivateOracle {
             // Create a new note
             // Store the answer in the oracle set
             storage.answers.insert(&mut answer);
+
+            let encrypted = answer.serialize();
+
+            // Encrypt the answer in the oracle notes
+            emit_encrypted_log(
+                &mut context,
+                caller,
+                ANSWER_SET_SLOT,
+                get_public_key(caller),
+                encrypted,
+            );
         }
 
         // Encrypt the answer in the requester notes

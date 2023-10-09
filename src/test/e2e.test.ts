@@ -48,7 +48,7 @@ beforeAll(async () => {
   requester = await createAccount(pxe);
   requester2 = await createAccount(pxe);
   divinity = await createAccount(pxe);
-});
+}, 30_000);
 
 describe("E2E Private Oracle", () => {
   describe("submit_question(..)", () => {

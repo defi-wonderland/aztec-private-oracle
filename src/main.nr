@@ -102,8 +102,9 @@ contract PrivateOracle {
         let sender = context.msg_sender();
 
         // Assert if question doesn't already exist from the same requester
-        let question_getter_option = NoteGetterOptions::new().select(0, question).set_limit(1);
+        let question_getter_option = NoteGetterOptions::new().select(0, question).select(1, sender).set_limit(1);
         let question_note = storage.questions.get_notes(question_getter_option)[0];
+
         assert(question_note.is_none());
 
         // Store the question in the requester notes and send it to the oracle notes too
@@ -133,7 +134,6 @@ contract PrivateOracle {
 
         // Encrypt the question in the divinity notes
         let divinity_pub_key = get_public_key(divinity_address);
-
 
         emit_encrypted_log(
             &mut context,

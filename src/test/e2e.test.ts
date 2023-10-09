@@ -114,6 +114,50 @@ describe("E2E Private Oracle", () => {
         shared_key_nullifier_requester
       );
     });
+
+    it("another requester can ask the same question", async () => {
+      // Submit the question
+      await oracle
+        .withWallet(requester2)
+        .methods.submit_question(123, divinity.getAddress())
+        .send()
+        .wait();
+
+      const divinityRequestsNotes = await pxe.getPrivateStorageAt(
+        divinity.getAddress(),
+        oracle.address,
+        QUESTIONS_SLOT
+      );
+
+      const requesterRequestsNotes = await pxe.getPrivateStorageAt(
+        requester.getAddress(),
+        oracle.address,
+        QUESTIONS_SLOT
+      );
+      // TODO: map and only keep the right requester (instead of taking the idx 1 which is funky)
+      expect(divinityRequestsNotes[1].items[0].value).toEqual(123n);
+      expect(AztecAddress.fromField(divinityRequestsNotes[1].items[1])).toEqual(
+        requester2.getAddress()
+      );
+      expect(AztecAddress.fromField(divinityRequestsNotes[1].items[2])).toEqual(
+        divinity.getAddress()
+      );
+
+      expect(requesterRequestsNotes[0].items[0].value).toEqual(123n);
+      expect(
+        AztecAddress.fromField(requesterRequestsNotes[0].items[1])
+      ).toEqual(requester2.getAddress());
+      expect(
+        AztecAddress.fromField(requesterRequestsNotes[0].items[2])
+      ).toEqual(divinity.getAddress());
+
+      expect(divinityRequestsNotes[1].items[3]).toEqual(
+        requesterRequestsNotes[0].items[3]
+      );
+      expect(divinityRequestsNotes[0].items[3]).not.toEqual(
+        shared_key_nullifier_divinity
+      );
+    });
   });
 
   describe("submit_answer(..)", () => {
@@ -193,7 +237,7 @@ describe("E2E Private Oracle", () => {
 
       await oracle
         .withWallet(divinity)
-        .methods.submit_answer(123, 789) // different answer passed, should be discarded
+        .methods.submit_answer(123, 789) // different answer passed, should be discarded and 456 used instead
         .send()
         .wait();
 

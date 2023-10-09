@@ -150,6 +150,7 @@ contract PrivateOracle {
     fn submit_answer(question: Field, answer: Field) {
         let storage = Storage::init(Context::private(&mut context));
         let caller = context.msg_sender();
+        let address_this = context.this_address();
 
         // Filter request note to check if existing and accesible for this divinity
         let request_filter = NoteGetterOptions::new()
@@ -181,15 +182,15 @@ contract PrivateOracle {
             // Create a new note and store it in the oracle set
             storage.answers.insert(&mut answer);
 
-            let encrypted = answer.serialize();
+            let answer_serialized = answer.serialize();
 
             // Encrypt the answer in the oracle notes
             emit_encrypted_log(
                 &mut context,
-                caller,
+                address_this,
                 ANSWER_SET_SLOT,
                 get_public_key(caller),
-                encrypted,
+                answer_serialized,
             );
         } else {
             // Update the answer to the preexisting one
@@ -203,7 +204,7 @@ contract PrivateOracle {
 
         emit_encrypted_log(
             &mut context,
-            caller,
+            address_this,
             ANSWER_SET_SLOT,
             requester_pub_key,
             encrypted,

@@ -169,20 +169,20 @@ contract PrivateOracle {
             .select(0, question)
             .set_limit(1);
         
-        let mut answer: AnswerNote = AnswerNote::new(
+        let mut new_answer_note: AnswerNote = AnswerNote::new(
             question,
             answer,
             caller
         );
 
-        let answer_note = storage.answers.get_notes(answerFilter)[0];
+        let stored_answer_note = storage.answers.get_notes(answerFilter)[0];
 
         // Hasn't been answered yet (in another request)?
-        if answer_note.is_none() {
+        if stored_answer_note.is_none() {
             // Create a new note and store it in the oracle set
-            storage.answers.insert(&mut answer);
+            storage.answers.insert(&mut new_answer_note);
 
-            let answer_serialized = answer.serialize();
+            let divinity_answer_serialized = new_answer_note.serialize();
 
             // Encrypt the answer in the oracle notes
             emit_encrypted_log(
@@ -190,24 +190,24 @@ contract PrivateOracle {
                 address_this,
                 ANSWER_SET_SLOT,
                 get_public_key(caller),
-                answer_serialized,
+                divinity_answer_serialized,
             );
         } else {
             // Update the answer to the preexisting one
-            answer.answer = answer_note.unwrap_unchecked().answer;
+            new_answer_note.answer = stored_answer_note.unwrap_unchecked().answer;
         }
 
         // Encrypt the answer in the requester notes
         let requester_pub_key = get_public_key(request.unwrap_unchecked().requester_address);
 
-        let encrypted = answer.serialize();
+        let requester_answer_serialized = new_answer_note.serialize();
 
         emit_encrypted_log(
             &mut context,
             address_this,
             ANSWER_SET_SLOT,
             requester_pub_key,
-            encrypted,
+            requester_answer_serialized,
         );
 
         // Nullify the question note

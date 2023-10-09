@@ -48,10 +48,10 @@ impl AnswerNote {
         ])[0]
     }
 
-// TODO: refactor to a set of immutable singleton instead
     // No nullifier needed -> only one divinity has access to the original request and the answer cannot change ever
+    // still returning a value (instead of assert(false) for instance) as we need it for compute_note_hash_for_read_or_nullify
+    // to emit encrypte logs
     fn compute_nullifier(self) -> Field {
-        assert(false);
         0
     }
 

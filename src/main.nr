@@ -149,26 +149,26 @@ contract PrivateOracle {
     #[aztec(private)]
     fn submit_answer(question: Field, requester: Field, answer: Field) { 
         let storage = Storage::init(Context::private(&mut context));
-        let caller = context.msg_sender();
+        let divinity_calling = context.msg_sender();
         let address_this = context.this_address();
 
         // Filter request note to check if existing and accesible for this divinity
         let request_filter = NoteGetterOptions::new()
             .select(0, question)
             .select(1, requester)
-            .select(2, caller)
+            .select(2, divinity_calling)
             .set_limit(1);
         
         // Get the question note
         let request = storage.questions.get_notes(request_filter)[0];
 
-        // Check if exists
+        // Check if the question exists
         assert(!request.is_none());
 
         // Check if this question was previously answered
         let answerFilter = NoteGetterOptions::new()
             .select(0, question)
-            .select(2, caller)
+            .select(2, divinity_calling)
             .set_limit(1);
         
         let stored_answer_note = storage.answers.get_notes(answerFilter)[0];
@@ -176,7 +176,7 @@ contract PrivateOracle {
         let mut new_answer_note: AnswerNote = AnswerNote::new(
             question,
             answer,
-            caller
+            divinity_calling
         );
 
         // Hasn't been answered yet (in another request)?
@@ -191,19 +191,22 @@ contract PrivateOracle {
                 &mut context,
                 address_this,
                 ANSWER_SET_SLOT,
-                get_public_key(caller),
+                get_public_key(divinity_calling),
                 divinity_answer_serialized,
             );
         } else {
-            // Update the answer to the preexisting one
+            // Update the answer to the preexisting one, to add it to the requester notes only
             new_answer_note = AnswerNote::new(
                 question,
                 stored_answer_note.unwrap_unchecked().answer,
-                caller
-             );
+                requester
+            );
+
+            // Need to commit the note for the requester
+            storage.answers.insert(&mut new_answer_note);
         }
 
-        // Encrypt the answer in the requester notes
+        // Encrypt/add the answer in the requester notes
         let requester_pub_key = get_public_key(request.unwrap_unchecked().requester_address);
 
         let requester_answer_serialized = new_answer_note.serialize();

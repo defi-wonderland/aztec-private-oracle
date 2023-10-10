@@ -28,15 +28,20 @@ const {
 const QUESTIONS_SLOT: Fr = new Fr(1);
 const ANSWERS_SLOT: Fr = new Fr(2);
 
+const QUESTION = 123n;
+const ANSWER = 456n;
+const ALTERNATIVE_ANSWER = 789n;
+
 let pxe: PXE;
 let oracle: PrivateOracleContract;
 let requester: AccountWallet;
 let requester2: AccountWallet;
 let divinity: AccountWallet;
 
-beforeAll(async () => {
-  const logger = createDebugLogger("oracle");
+const logger = createDebugLogger("oracle");
 
+// Set the sandbox
+beforeAll(async () => {
   const { SANDBOX_URL = "http://localhost:8080" } = process.env;
   pxe = createPXEClient(SANDBOX_URL);
   await waitForSandbox(pxe);
@@ -60,13 +65,15 @@ describe("E2E Private Oracle", () => {
       const deployer = await createAccount(pxe);
 
       oracle = await PrivateOracleContract.deploy(deployer).send().deployed();
+
+      logger(`Oracle deployed at ${oracle.address}`);
     }, 30_000);
 
     it("Tx to submit_question is mined", async () => {
       // Submit the question
       const receipt = await oracle
         .withWallet(requester)
-        .methods.submit_question(123, divinity.getAddress())
+        .methods.submit_question(QUESTION, divinity.getAddress())
         .send()
         .wait();
 
@@ -80,7 +87,7 @@ describe("E2E Private Oracle", () => {
         QUESTIONS_SLOT
       );
 
-      expect(divinityRequestsNotes[0].items[0].value).toEqual(123n);
+      expect(divinityRequestsNotes[0].items[0].value).toEqual(QUESTION);
       expect(AztecAddress.fromField(divinityRequestsNotes[0].items[1])).toEqual(
         requester.getAddress()
       );
@@ -98,7 +105,7 @@ describe("E2E Private Oracle", () => {
         QUESTIONS_SLOT
       );
 
-      expect(requesterRequestsNotes[0].items[0].value).toEqual(123n);
+      expect(requesterRequestsNotes[0].items[0].value).toEqual(QUESTION);
       expect(
         AztecAddress.fromField(requesterRequestsNotes[0].items[1])
       ).toEqual(requester.getAddress());
@@ -115,11 +122,11 @@ describe("E2E Private Oracle", () => {
       );
     });
 
-    it("another requester can ask the same question", async () => {
+    it("another requester can ask the same question and will get a different nullifier shared key", async () => {
       // Submit the question
       await oracle
         .withWallet(requester2)
-        .methods.submit_question(123, divinity.getAddress())
+        .methods.submit_question(QUESTION, divinity.getAddress())
         .send()
         .wait();
 
@@ -130,12 +137,12 @@ describe("E2E Private Oracle", () => {
       );
 
       const requesterRequestsNotes = await pxe.getPrivateStorageAt(
-        requester.getAddress(),
+        requester2.getAddress(),
         oracle.address,
         QUESTIONS_SLOT
       );
       // TODO: map and only keep the right requester (instead of taking the idx 1 which is funky)
-      expect(divinityRequestsNotes[1].items[0].value).toEqual(123n);
+      expect(divinityRequestsNotes[1].items[0].value).toEqual(QUESTION);
       expect(AztecAddress.fromField(divinityRequestsNotes[1].items[1])).toEqual(
         requester2.getAddress()
       );
@@ -143,7 +150,7 @@ describe("E2E Private Oracle", () => {
         divinity.getAddress()
       );
 
-      expect(requesterRequestsNotes[0].items[0].value).toEqual(123n);
+      expect(requesterRequestsNotes[0].items[0].value).toEqual(QUESTION);
       expect(
         AztecAddress.fromField(requesterRequestsNotes[0].items[1])
       ).toEqual(requester2.getAddress());
@@ -151,10 +158,13 @@ describe("E2E Private Oracle", () => {
         AztecAddress.fromField(requesterRequestsNotes[0].items[2])
       ).toEqual(divinity.getAddress());
 
+      // Nullifier shared key is the same for requester and divinity
       expect(divinityRequestsNotes[1].items[3]).toEqual(
         requesterRequestsNotes[0].items[3]
       );
-      expect(divinityRequestsNotes[0].items[3]).not.toEqual(
+
+      // Shared shared key for nullifier is different from other note
+      expect(divinityRequestsNotes[1].items[3]).not.toEqual(
         shared_key_nullifier_divinity
       );
     });
@@ -170,7 +180,7 @@ describe("E2E Private Oracle", () => {
       // Submit the question
       await oracle
         .withWallet(requester)
-        .methods.submit_question(123, divinity.getAddress())
+        .methods.submit_question(QUESTION, divinity.getAddress())
         .send()
         .wait();
     }, 30_000);
@@ -179,7 +189,7 @@ describe("E2E Private Oracle", () => {
       // Submit the answer
       const receipt = await oracle
         .withWallet(divinity)
-        .methods.submit_answer(123, 456)
+        .methods.submit_answer(QUESTION, requester.getAddress(), ANSWER)
         .send()
         .wait();
 
@@ -193,8 +203,8 @@ describe("E2E Private Oracle", () => {
         ANSWERS_SLOT
       );
 
-      expect(divinityAnswersNotes[0].items[0].value).toEqual(123n);
-      expect(divinityAnswersNotes[0].items[1].value).toEqual(456n);
+      expect(divinityAnswersNotes[0].items[0].value).toEqual(QUESTION);
+      expect(divinityAnswersNotes[0].items[1].value).toEqual(ANSWER);
     });
 
     it("requester answer note has the correct data", async () => {
@@ -204,8 +214,8 @@ describe("E2E Private Oracle", () => {
         ANSWERS_SLOT
       );
 
-      expect(requesterAnswersNotes[0].items[0].value).toEqual(123n);
-      expect(requesterAnswersNotes[0].items[1].value).toEqual(456n);
+      expect(requesterAnswersNotes[0].items[0].value).toEqual(QUESTION);
+      expect(requesterAnswersNotes[0].items[1].value).toEqual(ANSWER);
     });
 
     it("requester request note has been nullified", async () => {
@@ -231,15 +241,43 @@ describe("E2E Private Oracle", () => {
     it("second identical question cannot have a different answer (from the same divinity)", async () => {
       await oracle
         .withWallet(requester2)
-        .methods.submit_question(123, divinity.getAddress())
+        .methods.submit_question(QUESTION, divinity.getAddress())
         .send()
         .wait();
 
+      let requesterRequestsNotes = await pxe.getPrivateStorageAt(
+        requester2.getAddress(),
+        oracle.address,
+        QUESTIONS_SLOT
+      );
+
+      console.log("Q before: ", requesterRequestsNotes);
+
+      let divAnswersNotes = await pxe.getPrivateStorageAt(
+        divinity.getAddress(),
+        oracle.address,
+        ANSWERS_SLOT
+      );
+
+      console.log("div ans before: ", divAnswersNotes);
+
       await oracle
         .withWallet(divinity)
-        .methods.submit_answer(123, 789) // different answer passed, should be discarded and 456 used instead
+        .methods.submit_answer(
+          QUESTION,
+          requester2.getAddress(),
+          ALTERNATIVE_ANSWER
+        ) // different answer passed, should be discarded
         .send()
         .wait();
+
+      requesterRequestsNotes = await pxe.getPrivateStorageAt(
+        requester2.getAddress(),
+        oracle.address,
+        QUESTIONS_SLOT
+      );
+
+      console.log("Q after: ", requesterRequestsNotes);
 
       const requester2AnswersNotes = await pxe.getPrivateStorageAt(
         requester2.getAddress(),
@@ -247,8 +285,18 @@ describe("E2E Private Oracle", () => {
         ANSWERS_SLOT
       );
 
-      expect(requester2AnswersNotes[0].items[0].value).toEqual(123n);
-      expect(requester2AnswersNotes[0].items[1].value).toEqual(456n);
+      console.log("ans after: ", requester2AnswersNotes);
+
+      divAnswersNotes = await pxe.getPrivateStorageAt(
+        divinity.getAddress(),
+        oracle.address,
+        ANSWERS_SLOT
+      );
+
+      console.log("div ans after: ", divAnswersNotes);
+
+      expect(requester2AnswersNotes[0].items[0].value).toEqual(QUESTION);
+      expect(requester2AnswersNotes[0].items[1].value).toEqual(ANSWER);
     });
   });
 });

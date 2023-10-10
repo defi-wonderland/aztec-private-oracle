@@ -1,5 +1,3 @@
-mod types;
-
 /**
 This first version is "free for use" (no fee) and "free for all" (anyone can answer to any question).
 
@@ -36,6 +34,7 @@ Answer:
 --> nullifier should be different here -> another note type (answer_note)
 
 */
+mod types;
  
 contract PrivateOracle {
     use crate::types::question_note:: {QuestionNote, QuestionNoteMethods, QUESTION_NOTE_LEN};
@@ -46,9 +45,9 @@ contract PrivateOracle {
     use dep::aztec::context::Context;
     use dep::aztec::log::emit_encrypted_log;
     use dep::aztec::note::{
+        note_getter_options::NoteGetterOptions,
         note_header::NoteHeader,
         note_interface::NoteInterface,
-        note_getter_options::NoteGetterOptions,
         note_viewer_options::NoteViewerOptions,
         utils as note_utils
     };
@@ -56,11 +55,13 @@ contract PrivateOracle {
         get_public_key::get_public_key,
         rand::rand
     };
-    use dep::aztec::state_vars::public_state::PublicState;
-    use dep::aztec::state_vars::map::Map;
-    use dep::aztec::state_vars::set::Set;
-    use dep::aztec::state_vars::singleton::Singleton;
-    use dep::aztec::state_vars::immutable_singleton::ImmutableSingleton;
+    use dep::aztec::state_vars::{
+        public_state::PublicState,
+        map::Map,
+        set::Set,
+        singleton::Singleton,
+        immutable_singleton::ImmutableSingleton
+    };
     use dep::aztec::types::type_serialization::field_serialization::{ FieldSerializationMethods, FIELD_SERIALIZED_LEN};
     
     global QUESTION_SET_SLOT = 1;
@@ -107,7 +108,7 @@ contract PrivateOracle {
 
         assert(question_note.is_none());
 
-        // Store the question in the requester notes and send it to the oracle notes too
+        // Store the question in the requester and the divinity notes
         let random_nullifier_shared_key = rand();
 
         let mut new_question: QuestionNote = QuestionNote::new(
@@ -117,33 +118,27 @@ contract PrivateOracle {
             random_nullifier_shared_key
         );
 
+        // Commit the note in the data tree
         storage.questions.insert(&mut new_question);
 
-        let serialized = new_question.serialize();
-
-        // Encrypt the qyestion in the requester notes - todo: we might remove it later, as the requester doesn't need to access the note (only contract)
-        let requester_pub_key = get_public_key(sender);
-
+        // Encrypt/send the question to the requester notes - todo: we might remove this event later, as the requester doesn't need to read the note (only contract)
         emit_encrypted_log(
             &mut context,
             address_this,
             QUESTION_SET_SLOT,
-            requester_pub_key,
-            serialized,
+            get_public_key(sender),
+            new_question.serialize(),
         );
 
-        // Encrypt the question in the divinity notes
-        let divinity_pub_key = get_public_key(divinity_address);
-
+        // Encrypt/send the question in the divinity notes
         emit_encrypted_log(
             &mut context,
             address_this,
             QUESTION_SET_SLOT,
-            divinity_pub_key,
-            serialized,
+            get_public_key(divinity_address),
+            new_question.serialize(),
         ); 
     }
-
 
     // Divinity submit an answer to a given question
     #[aztec(private)]
@@ -195,31 +190,29 @@ contract PrivateOracle {
                 divinity_answer_serialized,
             );
         } else {
-            // Update the answer to the preexisting one, to add it to the requester notes only
+            // Modify the answer to the preexisting one, to add it to the requester notes only
             new_answer_note = AnswerNote::new(
                 question,
                 stored_answer_note.unwrap_unchecked().answer,
                 requester
             );
 
-            // Need to commit the note for the requester
+            // Commit the note
             storage.answers.insert(&mut new_answer_note);
         }
 
-        // Encrypt/add the answer in the requester notes
+        // Send the note to the requester
         let requester_pub_key = get_public_key(request.unwrap_unchecked().requester_address);
-
-        let requester_answer_serialized = new_answer_note.serialize();
 
         emit_encrypted_log(
             &mut context,
             address_this,
             ANSWER_SET_SLOT,
             requester_pub_key,
-            requester_answer_serialized,
+            new_answer_note.serialize(),
         );
 
-        // Nullify the question note
+        // Nullify the question note (will nullify both divinity and requester notes, via the shared key)
         storage.questions.remove(request.unwrap_unchecked());
     }
 

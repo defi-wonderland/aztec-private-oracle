@@ -245,55 +245,21 @@ describe("E2E Private Oracle", () => {
         .send()
         .wait();
 
-      let requesterRequestsNotes = await pxe.getPrivateStorageAt(
-        requester2.getAddress(),
-        oracle.address,
-        QUESTIONS_SLOT
-      );
-
-      console.log("Q before: ", requesterRequestsNotes);
-
-      let divAnswersNotes = await pxe.getPrivateStorageAt(
-        divinity.getAddress(),
-        oracle.address,
-        ANSWERS_SLOT
-      );
-
-      console.log("div ans before: ", divAnswersNotes);
-
       await oracle
         .withWallet(divinity)
         .methods.submit_answer(
           QUESTION,
           requester2.getAddress(),
           ALTERNATIVE_ANSWER
-        ) // different answer passed, should be discarded
+        ) // different answer passed, should be discarded and keep the original ANSWER
         .send()
         .wait();
-
-      requesterRequestsNotes = await pxe.getPrivateStorageAt(
-        requester2.getAddress(),
-        oracle.address,
-        QUESTIONS_SLOT
-      );
-
-      console.log("Q after: ", requesterRequestsNotes);
 
       const requester2AnswersNotes = await pxe.getPrivateStorageAt(
         requester2.getAddress(),
         oracle.address,
         ANSWERS_SLOT
       );
-
-      console.log("ans after: ", requester2AnswersNotes);
-
-      divAnswersNotes = await pxe.getPrivateStorageAt(
-        divinity.getAddress(),
-        oracle.address,
-        ANSWERS_SLOT
-      );
-
-      console.log("div ans after: ", divAnswersNotes);
 
       expect(requester2AnswersNotes[0].items[0].value).toEqual(QUESTION);
       expect(requester2AnswersNotes[0].items[1].value).toEqual(ANSWER);

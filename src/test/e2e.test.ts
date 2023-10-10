@@ -265,4 +265,50 @@ describe("E2E Private Oracle", () => {
       expect(requester2AnswersNotes[0].items[1].value).toEqual(ANSWER);
     });
   });
+
+  describe("cancel_question(..)", () => {
+    // Deploy the oracle and submit the question
+    beforeAll(async () => {
+      const deployer = await createAccount(pxe);
+
+      oracle = await PrivateOracleContract.deploy(deployer).send().deployed();
+
+      // Submit the question
+      await oracle
+        .withWallet(requester)
+        .methods.submit_question(QUESTION, divinity.getAddress())
+        .send()
+        .wait();
+    }, 30_000);
+
+    it("Tx to cancel_question is mined", async () => {
+      const receipt = await oracle
+        .withWallet(requester)
+        .methods.cancel_question(QUESTION)
+        .send()
+        .wait();
+
+      expect(receipt.status).toBe("mined");
+    });
+
+    it("requester request note has been nullified", async () => {
+      const requesterRequestsNotes = await pxe.getPrivateStorageAt(
+        requester.getAddress(),
+        oracle.address,
+        QUESTIONS_SLOT
+      );
+
+      expect(requesterRequestsNotes.length).toEqual(0);
+    });
+
+    it("divinity request note has been nullified", async () => {
+      const divinityRequestsNotes = await pxe.getPrivateStorageAt(
+        divinity.getAddress(),
+        oracle.address,
+        QUESTIONS_SLOT
+      );
+
+      expect(divinityRequestsNotes.length).toEqual(0);
+    });
+  });
 });

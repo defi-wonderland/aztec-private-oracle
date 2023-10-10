@@ -147,7 +147,7 @@ contract PrivateOracle {
 
     // Divinity submit an answer to a given question
     #[aztec(private)]
-    fn submit_answer(question: Field, answer: Field) {
+    fn submit_answer(question: Field, requester: Field, answer: Field) { 
         let storage = Storage::init(Context::private(&mut context));
         let caller = context.msg_sender();
         let address_this = context.this_address();
@@ -155,6 +155,7 @@ contract PrivateOracle {
         // Filter request note to check if existing and accesible for this divinity
         let request_filter = NoteGetterOptions::new()
             .select(0, question)
+            .select(1, requester)
             .select(2, caller)
             .set_limit(1);
         
@@ -167,15 +168,16 @@ contract PrivateOracle {
         // Check if this question was previously answered
         let answerFilter = NoteGetterOptions::new()
             .select(0, question)
+            .select(2, caller)
             .set_limit(1);
         
+        let stored_answer_note = storage.answers.get_notes(answerFilter)[0];
+
         let mut new_answer_note: AnswerNote = AnswerNote::new(
             question,
             answer,
             caller
         );
-
-        let stored_answer_note = storage.answers.get_notes(answerFilter)[0];
 
         // Hasn't been answered yet (in another request)?
         if stored_answer_note.is_none() {
@@ -194,7 +196,11 @@ contract PrivateOracle {
             );
         } else {
             // Update the answer to the preexisting one
-            new_answer_note.answer = stored_answer_note.unwrap_unchecked().answer;
+            new_answer_note = AnswerNote::new(
+                question,
+                stored_answer_note.unwrap_unchecked().answer,
+                caller
+             );
         }
 
         // Encrypt the answer in the requester notes

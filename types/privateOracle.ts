@@ -81,8 +81,8 @@ export class PrivateOracleContract extends ContractBase {
     /** consult_answer(question: field) */
     consult_answer: ((question: FieldLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 
-    /** submit_answer(question: field, answer: field) */
-    submit_answer: ((question: FieldLike, answer: FieldLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
+    /** submit_answer(question: field, requester: field, answer: field) */
+    submit_answer: ((question: FieldLike, requester: FieldLike, answer: FieldLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 
     /** submit_question(question: field, divinity_address: field) */
     submit_question: ((question: FieldLike, divinity_address: FieldLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;

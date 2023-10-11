@@ -24,7 +24,7 @@ struct QuestionNote {
     header: NoteHeader
 }
 
-global QUESTION_NOTE_LEN: Field = 4; // requester PK points takes 2 elements for its coordinates
+global QUESTION_NOTE_LEN: Field = 4;
 
 impl QuestionNote {
     fn new( _request: Field,
@@ -51,8 +51,8 @@ impl QuestionNote {
         QuestionNote {
             request: preimage[0],
             requester_address: preimage[1],
-            divinity_address: preimage[4],
-            shared_nullifier_key: preimage[5], 
+            divinity_address: preimage[2],
+            shared_nullifier_key: preimage[3], 
             header: NoteHeader::empty(),
         }
     }
@@ -62,7 +62,6 @@ impl QuestionNote {
     }
 
     fn compute_nullifier(self) -> Field {
-
         let note_hash_for_nullify = compute_note_hash_for_read_or_nullify(QuestionNoteMethods, self);
         let nullifier_key = self.shared_nullifier_key;
 

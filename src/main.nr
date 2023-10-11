@@ -1,5 +1,3 @@
-mod types;
-
 /**
 This first version is "free for use" (no fee) and "free for all" (anyone can answer to any question).
 
@@ -36,6 +34,7 @@ Answer:
 --> nullifier should be different here -> another note type (answer_note)
 
 */
+mod types;
  
 contract PrivateOracle {
     use crate::types::question_note:: {QuestionNote, QuestionNoteMethods, QUESTION_NOTE_LEN};
@@ -46,30 +45,35 @@ contract PrivateOracle {
     use dep::aztec::context::Context;
     use dep::aztec::log::emit_encrypted_log;
     use dep::aztec::note::{
+        note_getter_options::NoteGetterOptions,
         note_header::NoteHeader,
         note_interface::NoteInterface,
-        note_getter_options::NoteGetterOptions,
         note_viewer_options::NoteViewerOptions,
-        utils::compute_note_hash_for_read_or_nullify,
+        utils as note_utils
     };
     use dep::aztec::oracle::{
         get_public_key::get_public_key,
         rand::rand
     };
-    use dep::aztec::state_vars::public_state::PublicState;
-    use dep::aztec::state_vars::map::Map;
-    use dep::aztec::state_vars::set::Set;
-    use dep::aztec::state_vars::singleton::Singleton;
-    use dep::aztec::state_vars::immutable_singleton::ImmutableSingleton;
+    use dep::aztec::state_vars::{
+        public_state::PublicState,
+        map::Map,
+        set::Set,
+        singleton::Singleton,
+        immutable_singleton::ImmutableSingleton
+    };
     use dep::aztec::types::type_serialization::field_serialization::{ FieldSerializationMethods, FIELD_SERIALIZED_LEN};
-            
+    
+    global QUESTION_SET_SLOT = 1;
+    global ANSWER_SET_SLOT = 2;
+
     struct Storage {
+        questions: Set<QuestionNote, QUESTION_NOTE_LEN>,
+        answers: Set<AnswerNote, ANSWER_NOTE_LEN> // TODO: use a set of immutable singletons
         // payment_token: PublicState<Field, FIELD_SERIALIZED_LEN>,
         // fee: PublicState<Field, FIELD_SERIALIZED_LEN>,
         // stored_balance: PublicState<Field, FIELD_SERIALIZED_LEN>,
         // balance_of: Map<Set<ValueNote, VALUE_NOTE_LEN>>,
-        questions: Set<QuestionNote, QUESTION_NOTE_LEN>,
-        answers: Set<AnswerNote, ANSWER_NOTE_LEN> // TODO: use a set of immutable singletons
     }
 
     impl Storage {
@@ -79,9 +83,9 @@ contract PrivateOracle {
 
                 // -- Private --
                 // Set of questions
-                questions: Set::new(context, 6, QuestionNoteMethods),
+                questions: Set::new(context, QUESTION_SET_SLOT, QuestionNoteMethods),
                 // Set of answers
-                answers: Set::new(context, 7, AnswerNoteMethods)
+                answers: Set::new(context, ANSWER_SET_SLOT, AnswerNoteMethods)
             }
         }
     }
@@ -99,94 +103,117 @@ contract PrivateOracle {
         let sender = context.msg_sender();
 
         // Assert if question doesn't already exist from the same requester
-        let question_getter_option = NoteGetterOptions::new().select(0, question).set_limit(1);
+        let question_getter_option = NoteGetterOptions::new().select(0, question).select(1, sender).set_limit(1);
         let question_note = storage.questions.get_notes(question_getter_option)[0];
+
         assert(question_note.is_none());
 
-        // Store the question in the requester notes and send it to the oracle notes too
+        // Store the question in the requester and the divinity notes
         let random_nullifier_shared_key = rand();
 
-        let mut newquestion: QuestionNote = QuestionNote::new(
+        let mut new_question: QuestionNote = QuestionNote::new(
             question,
             sender, 
             divinity_address,
             random_nullifier_shared_key
         );
 
-        storage.questions.insert(&mut newquestion);
+        // Commit the note in the data tree
+        storage.questions.insert(&mut new_question);
 
-        // Encrypt the question in the divinity notes
-        let divinity_pub_key = get_public_key(divinity_address);
-        let questionsstorage_slot = storage.questions.storage_slot;
-
-        let encrypted = newquestion.serialize();
-
+        // Encrypt/send the question to the requester notes - todo: we might remove this event later, as the requester doesn't need to read the note (only contract)
         emit_encrypted_log(
             &mut context,
             address_this,
-            questionsstorage_slot,
-            divinity_pub_key,
-            encrypted,
+            QUESTION_SET_SLOT,
+            get_public_key(sender),
+            new_question.serialize(),
+        );
+
+        // Encrypt/send the question in the divinity notes
+        emit_encrypted_log(
+            &mut context,
+            address_this,
+            QUESTION_SET_SLOT,
+            get_public_key(divinity_address),
+            new_question.serialize(),
         ); 
     }
 
-
-    // Oracle submit an answer to a given question
+    // Divinity submit an answer to a given question
     #[aztec(private)]
-    fn submit_answer(question: Field, answer: Field) {
+    fn submit_answer(question: Field, requester: Field, answer: Field) { 
         let storage = Storage::init(Context::private(&mut context));
-        let caller = context.msg_sender();
+        let divinity_calling = context.msg_sender();
+        let address_this = context.this_address();
 
-        // Filter request note to check if existing (either wrong request or already answered) and accesible for this divinity (should't happen)
+        // Filter request note to check if existing and accesible for this divinity
         let request_filter = NoteGetterOptions::new()
             .select(0, question)
-            .select(3, caller)
+            .select(1, requester)
+            .select(2, divinity_calling)
             .set_limit(1);
         
         // Get the question note
         let request = storage.questions.get_notes(request_filter)[0];
 
-        // Check if exists
+        // Check if the question exists
         assert(!request.is_none());
 
         // Check if this question was previously answered
         let answerFilter = NoteGetterOptions::new()
             .select(0, question)
+            .select(2, divinity_calling)
             .set_limit(1);
         
-        let mut answer: AnswerNote = AnswerNote::new(
+        let stored_answer_note = storage.answers.get_notes(answerFilter)[0];
+
+        let mut new_answer_note: AnswerNote = AnswerNote::new(
             question,
             answer,
-            caller
+            divinity_calling
         );
 
-        let answer_note = storage.answers.get_notes(answerFilter)[0].unwrap_unchecked();
+        // Hasn't been answered yet (in another request)?
+        if stored_answer_note.is_none() {
+            // Create a new note and store it in the oracle set
+            storage.answers.insert(&mut new_answer_note);
 
-        // TODO: this check might not be hit (fail before) if the note is uninit -> filter fn using is_some()?
-        // This question has already been answered?
-        if answer_note.answer != 0 {
-            // Update the answer to the preexisting one
-            answer.answer = answer_note.answer;
-        // If not, use the answer passed as arg
+            let divinity_answer_serialized = new_answer_note.serialize();
+
+            // Encrypt the answer in the oracle notes
+            emit_encrypted_log(
+                &mut context,
+                address_this,
+                ANSWER_SET_SLOT,
+                get_public_key(divinity_calling),
+                divinity_answer_serialized,
+            );
         } else {
-            // Create a new note
-            // Store the answer in the oracle set
-            storage.answers.insert(&mut answer);
+            // Modify the answer to the preexisting one, to add it to the requester notes only
+            new_answer_note = AnswerNote::new(
+                question,
+                stored_answer_note.unwrap_unchecked().answer,
+                requester
+            );
+
+            // Commit the note
+            storage.answers.insert(&mut new_answer_note);
         }
 
-        // Encrypt the answer in the requester notes
+        // Send the note to the requester
         let requester_pub_key = get_public_key(request.unwrap_unchecked().requester_address);
-        let answers_storage_slot = storage.answers.storage_slot;
-
-        let encrypted = answer.serialize();
 
         emit_encrypted_log(
             &mut context,
-            caller,
-            answers_storage_slot,
+            address_this,
+            ANSWER_SET_SLOT,
             requester_pub_key,
-            encrypted,
+            new_answer_note.serialize(),
         );
+
+        // Nullify the question note (will nullify both divinity and requester notes, via the shared key)
+        storage.questions.remove(request.unwrap_unchecked());
     }
 
     // Requester consults the answer to one of their questions
@@ -217,5 +244,17 @@ contract PrivateOracle {
 
         // nullify the note
         storage.questions.remove(question_note);
+    }
+
+    // Computes note hash and nullifier.
+    unconstrained fn compute_note_hash_and_nullifier(contract_address: Field, nonce: Field, storage_slot: Field, preimage: [Field; QUESTION_NOTE_LEN]) -> [Field; 4] {
+        let note_header = NoteHeader::new(contract_address, nonce, storage_slot);
+
+        if(storage_slot == QUESTION_SET_SLOT) {
+            note_utils::compute_note_hash_and_nullifier(QuestionNoteMethods, note_header, preimage)
+        }
+        else {
+            note_utils::compute_note_hash_and_nullifier(AnswerNoteMethods, note_header, preimage)
+        }
     }
 }

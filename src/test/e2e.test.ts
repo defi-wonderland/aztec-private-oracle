@@ -18,7 +18,7 @@ import {
 import { toBigIntBE } from "@aztec/foundation/bigint-buffer";
 import { format } from "util";
 
-import { PrivateOracleContract } from "../../types/privateOracle.js";
+import { PrivateOracleContract } from "../../types/PrivateOracle.js";
 
 const {
   SANDBOX_URL = "http://localhost:8080",

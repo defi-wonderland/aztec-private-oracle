@@ -14,6 +14,7 @@ import {
   getSandboxAccountsWallets,
   waitForSandbox,
   AztecAddress,
+  AccountWalletWithPrivateKey,
 } from "@aztec/aztec.js";
 import { toBigIntBE } from "@aztec/foundation/bigint-buffer";
 import { format } from "util";
@@ -34,9 +35,10 @@ const ALTERNATIVE_ANSWER = 789n;
 
 let pxe: PXE;
 let oracle: PrivateOracleContract;
-let requester: AccountWallet;
-let requester2: AccountWallet;
-let divinity: AccountWallet;
+let requester: AccountWalletWithPrivateKey;
+let requester2: AccountWalletWithPrivateKey;
+let divinity: AccountWalletWithPrivateKey;
+let deployer: AccountWalletWithPrivateKey;
 
 const logger = createDebugLogger("oracle");
 
@@ -50,11 +52,8 @@ beforeAll(async () => {
 
   logger(format("Aztec Sandbox Info ", nodeInfo));
 
-  requester = await createAccount(pxe);
-  requester2 = await createAccount(pxe);
-  divinity = await createAccount(pxe);
+  [requester, requester2, divinity] = await getSandboxAccountsWallets(pxe);
 }, 30_000);
-
 
 describe("E2E Private Oracle", () => {
   describe("submit_question(..)", () => {
@@ -64,9 +63,7 @@ describe("E2E Private Oracle", () => {
 
     // Setup: Deploy the oracle
     beforeAll(async () => {
-      const deployer = await createAccount(pxe);
-
-      oracle = await PrivateOracleContract.deploy(deployer).send().deployed();
+      oracle = await PrivateOracleContract.deploy(pxe).send().deployed();
 
       logger(`Oracle deployed at ${oracle.address}`);
     }, 30_000);
@@ -190,10 +187,8 @@ describe("E2E Private Oracle", () => {
   describe("submit_answer(..)", () => {
     // Setup: Deploy the oracle and submit a question
     beforeAll(async () => {
-      const deployer = await createAccount(pxe);
-
       // Deploy the oracle
-      oracle = await PrivateOracleContract.deploy(deployer).send().deployed();
+      oracle = await PrivateOracleContract.deploy(pxe).send().deployed();
 
       // Submit a question
       await oracle
@@ -227,9 +222,14 @@ describe("E2E Private Oracle", () => {
       // Check: Compare the note's data with the expected values
       expect(divinityAnswersNotes[0].items[0].value).toEqual(QUESTION);
       expect(divinityAnswersNotes[0].items[1].value).toEqual(ANSWER);
+      expect(
+        AztecAddress.fromBigInt(divinityAnswersNotes[0].items[2].value)
+      ).toEqual(divinity.getAddress());
     });
 
-    // Test: is the answer note stored correct, for the requester
+    // Test: Is the data of the answer note stored correct, for the requester?
+    //       The owner should be the requester (not tested otherwise, as we "cheat" with getPrivateStorageAt
+    //       and the sk is in the current pxe)
     it("requester answer note has the correct data", async () => {
       // Get the private storage for the requester's answer slot
       const requesterAnswersNotes = await pxe.getPrivateStorageAt(
@@ -241,6 +241,9 @@ describe("E2E Private Oracle", () => {
       // Check: Compare the note's data with the expected values
       expect(requesterAnswersNotes[0].items[0].value).toEqual(QUESTION);
       expect(requesterAnswersNotes[0].items[1].value).toEqual(ANSWER);
+      expect(
+        AztecAddress.fromBigInt(requesterAnswersNotes[0].items[2].value)
+      ).toEqual(requester.getAddress());
     });
 
     // Test: is the request note of the requester now nullified
@@ -306,10 +309,8 @@ describe("E2E Private Oracle", () => {
   describe("cancel_question(..)", () => {
     // Setup: Deploy the oracle and submit the question
     beforeAll(async () => {
-      const deployer = await createAccount(pxe);
-
       // Deploy the oracle
-      oracle = await PrivateOracleContract.deploy(deployer).send().deployed();
+      oracle = await PrivateOracleContract.deploy(pxe).send().deployed();
 
       // Submit a question
       await oracle

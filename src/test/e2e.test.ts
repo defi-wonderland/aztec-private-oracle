@@ -15,10 +15,6 @@ import {
   waitForSandbox,
   AztecAddress,
   AccountWalletWithPrivateKey,
-  Wallet,
-  createAccounts,
-  Point,
-  CompleteAddress,
 } from "@aztec/aztec.js";
 import { toBigIntBE } from "@aztec/foundation/bigint-buffer";
 import { format } from "util";

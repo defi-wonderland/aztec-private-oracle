@@ -168,7 +168,14 @@ contract PrivateOracle {
         
         let stored_answer_note = storage.answers.get_notes(answerFilter)[0];
 
-        let mut new_answer_note: AnswerNote = AnswerNote::new(
+        // Create new notes for both sides
+        let mut new_answer_note_for_requester: AnswerNote = AnswerNote::new(
+            question,
+            answer,
+            requester
+        );
+
+        let mut new_answer_note_for_divinity: AnswerNote = AnswerNote::new(
             question,
             answer,
             divinity_calling
@@ -176,32 +183,37 @@ contract PrivateOracle {
 
         // Hasn't been answered yet (in another request)?
         if stored_answer_note.is_none() {
-            // Create a new note and store it in the oracle set
-            storage.answers.insert(&mut new_answer_note);
-
-            let divinity_answer_serialized = new_answer_note.serialize();
-
             // Encrypt the answer in the oracle notes
             emit_encrypted_log(
                 &mut context,
                 address_this,
                 ANSWER_SET_SLOT,
                 get_public_key(divinity_calling),
-                divinity_answer_serialized,
+                new_answer_note_for_divinity.serialize(),
             );
-        } else {
-            // Modify the answer to the preexisting one, to add it to the requester notes only
-            new_answer_note = AnswerNote::new(
+        }
+        else {
+            // Already answered previously?
+            // Modify the answer to the preexisting one
+            new_answer_note_for_requester = AnswerNote::new(
                 question,
                 stored_answer_note.unwrap_unchecked().answer,
                 requester
             );
 
-            // Commit the note
-            storage.answers.insert(&mut new_answer_note);
+            new_answer_note_for_divinity = AnswerNote::new(
+                question,
+                stored_answer_note.unwrap_unchecked().answer,
+                divinity_calling
+            );
         }
 
-        // Send the note to the requester
+        // Commit both notes in data tree, as insert in an if() (ie to avoid duplicating the divinity one)
+        // fails (unreachable code panick)
+        storage.answers.insert(&mut new_answer_note_for_divinity);
+        storage.answers.insert(&mut new_answer_note_for_requester);
+
+        // Send the note to the requester (divinity already has the answer)
         let requester_pub_key = get_public_key(request.unwrap_unchecked().requester_address);
 
         emit_encrypted_log(
@@ -209,7 +221,7 @@ contract PrivateOracle {
             address_this,
             ANSWER_SET_SLOT,
             requester_pub_key,
-            new_answer_note.serialize(),
+            new_answer_note_for_requester.serialize(),
         );
 
         // Nullify the question note (will nullify both divinity and requester notes, via the shared key)

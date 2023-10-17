@@ -391,7 +391,7 @@ describe("E2E Private Oracle", () => {
       // Check: Compare the answer with the expected value
       expect(answer.request).toEqual(QUESTION);
       expect(answer.answer).toEqual(ANSWER);
-      expect(AztecAddress.fromBigInt(answer.owner)).toEqual(
+      expect(AztecAddress.fromBigInt(answer.owner.address)).toEqual(
         requester.getAddress()
       );
     });
@@ -407,7 +407,7 @@ describe("E2E Private Oracle", () => {
       // Check: Compare the answer with the expected value
       expect(answer.request).toEqual(QUESTION);
       expect(answer.answer).toEqual(ANSWER);
-      expect(AztecAddress.fromBigInt(answer.owner)).toEqual(
+      expect(AztecAddress.fromBigInt(answer.owner.address)).toEqual(
         divinity.getAddress()
       );
     });

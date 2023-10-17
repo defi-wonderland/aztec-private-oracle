@@ -7,18 +7,19 @@ use dep::aztec::oracle::{
     get_secret_key::get_secret_key,
     get_public_key::get_public_key,
 };
+use dep::aztec::types::address::AztecAddress;
 
 struct AnswerNote {
     request: Field,
     answer: Field,
-    owner: Field, // Owner of this answer, either the divinity or the requester
+    owner: AztecAddress, // Owner of this answer, either the divinity or the requester
     header: NoteHeader
 }
 
 global ANSWER_NOTE_LEN: Field = 3;
 
 impl AnswerNote {
-    fn new(_request: Field, _answer: Field, _owner: Field) -> Self {
+    fn new(_request: Field, _answer: Field, _owner: AztecAddress) -> Self {
         AnswerNote {
             request: _request,
             answer: _answer,
@@ -28,14 +29,14 @@ impl AnswerNote {
     }
 
     fn serialize(self) -> [Field; ANSWER_NOTE_LEN] {
-        [self.request, self.answer, self.owner]
+        [self.request, self.answer, self.owner.address]
     }
 
     fn deserialize(preimage: [Field; ANSWER_NOTE_LEN]) -> Self {
         AnswerNote {
             request: preimage[0],
             answer: preimage[1],
-            owner: preimage[2],
+            owner: AztecAddress::new(preimage[2]),
             header: NoteHeader::empty(),
         }
     }
@@ -44,7 +45,7 @@ impl AnswerNote {
         dep::std::hash::pedersen([
             self.request,
             self.answer,
-            self.owner
+            self.owner.address
         ])[0]
     }
 

@@ -9,6 +9,7 @@ use dep::aztec::oracle::{
 };
 
 use dep::aztec::types::point::Point;
+use dep::aztec::types::address::AztecAddress;
 
 /// @member request: the question asked
 /// @member requester_address: the address of the requester
@@ -18,8 +19,8 @@ use dep::aztec::types::point::Point;
 /// @member header: the note header
 struct QuestionNote {
     request: Field,
-    requester_address: Field,
-    divinity_address: Field,
+    requester_address: AztecAddress,
+    divinity_address: AztecAddress,
     shared_nullifier_key: Field,
     header: NoteHeader
 }
@@ -28,8 +29,8 @@ global QUESTION_NOTE_LEN: Field = 4;
 
 impl QuestionNote {
     fn new( _request: Field,
-            _requesterAddress: Field,
-            _divinityAddress: Field,
+            _requesterAddress: AztecAddress,
+            _divinityAddress: AztecAddress,
             _sharedNullifierKey: Field
         ) -> Self {
 
@@ -44,14 +45,14 @@ impl QuestionNote {
     }
 
     fn serialize(self) -> [Field; QUESTION_NOTE_LEN] {
-        [self.request, self.requester_address, self.divinity_address, self.shared_nullifier_key]
+        [self.request, self.requester_address.address, self.divinity_address.address, self.shared_nullifier_key]
     }
 
     fn deserialize(preimage: [Field; QUESTION_NOTE_LEN]) -> Self {
         QuestionNote {
             request: preimage[0],
-            requester_address: preimage[1],
-            divinity_address: preimage[2],
+            requester_address: AztecAddress::new(preimage[1]),
+            divinity_address: AztecAddress::new(preimage[2]),
             shared_nullifier_key: preimage[3], 
             header: NoteHeader::empty(),
         }

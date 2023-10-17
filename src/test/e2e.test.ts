@@ -27,12 +27,13 @@ const {
   ETHEREUM_HOST = "http://localhost:8545",
 } = process.env;
 
-const QUESTIONS_SLOT: Fr = new Fr(1);
-const ANSWERS_SLOT: Fr = new Fr(2);
+const QUESTIONS_SLOT: Fr = new Fr(3);
+const ANSWERS_SLOT: Fr = new Fr(4);
 
 const QUESTION = 123n;
 const ANSWER = 456n;
 const ALTERNATIVE_ANSWER = 789n;
+const FEE = 1000n;
 
 let pxe: PXE;
 let oracle: PrivateOracleContract;
@@ -40,6 +41,7 @@ let requester: AccountWalletWithPrivateKey;
 let requester2: AccountWalletWithPrivateKey;
 let divinity: AccountWalletWithPrivateKey;
 let deployer: AccountWalletWithPrivateKey;
+let token: AztecAddress;
 
 const logger = createDebugLogger("oracle");
 
@@ -54,6 +56,7 @@ beforeAll(async () => {
   logger(format("Aztec Sandbox Info ", nodeInfo));
 
   [requester, requester2, divinity] = await getSandboxAccountsWallets(pxe);
+  token = requester.getAddress();
 }, 30_000);
 
 describe("E2E Private Oracle", () => {
@@ -64,7 +67,7 @@ describe("E2E Private Oracle", () => {
 
     // Setup: Deploy the oracle
     beforeAll(async () => {
-      oracle = await PrivateOracleContract.deploy(pxe).send().deployed();
+      oracle = await PrivateOracleContract.deploy(pxe, token, FEE).send().deployed();
 
       logger(`Oracle deployed at ${oracle.address}`);
     }, 30_000);
@@ -189,7 +192,7 @@ describe("E2E Private Oracle", () => {
     // Setup: Deploy the oracle and submit a question
     beforeAll(async () => {
       // Deploy the oracle
-      oracle = await PrivateOracleContract.deploy(pxe).send().deployed();
+      oracle = await PrivateOracleContract.deploy(pxe, token, FEE).send().deployed();
 
       // Submit a question
       await oracle
@@ -311,7 +314,7 @@ describe("E2E Private Oracle", () => {
     // Setup: Deploy the oracle and submit the question
     beforeAll(async () => {
       // Deploy the oracle
-      oracle = await PrivateOracleContract.deploy(pxe).send().deployed();
+      oracle = await PrivateOracleContract.deploy(pxe, token, FEE).send().deployed();
 
       // Submit a question
       await oracle
@@ -363,7 +366,7 @@ describe("E2E Private Oracle", () => {
     // Setup: Deploy the oracle and submit a question
     beforeAll(async () => {
       // Deploy the oracle
-      oracle = await PrivateOracleContract.deploy(pxe).send().deployed();
+      oracle = await PrivateOracleContract.deploy(pxe, token, FEE).send().deployed();
 
       // Submit a question
       await oracle

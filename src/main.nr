@@ -62,25 +62,40 @@ contract PrivateOracle {
         singleton::Singleton,
         immutable_singleton::ImmutableSingleton
     };
+    use dep::aztec::selector::compute_selector;
     use dep::aztec::types::type_serialization::field_serialization::{ FieldSerializationMethods, FIELD_SERIALIZED_LEN};
     
-    global QUESTION_SET_SLOT = 1;
-    global ANSWER_SET_SLOT = 2;
+    use dep::aztec::types::address::AztecAddress;
+    use dep::aztec::types::type_serialization::aztec_address_serialization::{AztecAddressSerializationMethods, AZTEC_ADDRESS_SERIALIZED_LEN};
+
+    global PAYMENT_TOKEN_SLOT = 1;
+    global FEE_SLOT = 2;
+    global QUESTION_SET_SLOT = 3;
+    global ANSWER_SET_SLOT = 4;
 
     struct Storage {
+        payment_token: PublicState<AztecAddress, AZTEC_ADDRESS_SERIALIZED_LEN>,
+        fee: PublicState<Field, FIELD_SERIALIZED_LEN>,
         questions: Set<QuestionNote, QUESTION_NOTE_LEN>,
         answers: Set<AnswerNote, ANSWER_NOTE_LEN> // TODO: use a set of immutable singletons
-        // payment_token: PublicState<Field, FIELD_SERIALIZED_LEN>,
-        // fee: PublicState<Field, FIELD_SERIALIZED_LEN>,
-        // stored_balance: PublicState<Field, FIELD_SERIALIZED_LEN>,
-        // balance_of: Map<Set<ValueNote, VALUE_NOTE_LEN>>,
     }
 
     impl Storage {
         fn init(context: Context) -> pub Self {
             Storage {
                 // -- Public --
-
+                // Token to use for payment
+                payment_token: PublicState::new(
+                    context,
+                    PAYMENT_TOKEN_SLOT,
+                    AztecAddressSerializationMethods,
+                ),
+                // Fee to pay for a question
+                fee: PublicState::new(
+                    context,
+                    FEE_SLOT,
+                    FieldSerializationMethods,
+                ),
                 // -- Private --
                 // Set of questions
                 questions: Set::new(context, QUESTION_SET_SLOT, QuestionNoteMethods),
@@ -91,8 +106,10 @@ contract PrivateOracle {
     }
  
     // Constructs the contract.
-    #[aztec(private)] 
-    fn constructor() {
+    #[aztec(private)]
+    fn constructor(payment_token: AztecAddress, fee: Field) {
+        let selector = compute_selector("_initialize(Field,Field)");
+        context.call_public_function(context.this_address(), selector, [payment_token.address,fee]);
     }
 
     // Requester submit a question
@@ -257,6 +274,12 @@ contract PrivateOracle {
 
         // nullify the note
         storage.questions.remove(question_note);
+    }
+
+    #[aztec(public)]
+    internal fn _initialize(payment_token: AztecAddress, fee: Field) {
+        storage.payment_token.write(payment_token);
+        storage.fee.write(fee);
     }
 
     // Get the answer to a question - unconstrained. Returns all answers to the same questions, from all the divinities

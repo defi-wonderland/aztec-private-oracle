@@ -15,6 +15,7 @@ import {
   waitForSandbox,
   AztecAddress,
   AccountWalletWithPrivateKey,
+  EthAddress,
 } from "@aztec/aztec.js";
 import { toBigIntBE } from "@aztec/foundation/bigint-buffer";
 import { format } from "util";
@@ -355,6 +356,60 @@ describe("E2E Private Oracle", () => {
 
       // Check: There is no request left (has been nullified when cancel_question was called)
       expect(divinityRequestsNotes.length).toEqual(0);
+    });
+  });
+
+  describe("unconstrained: get_answer_unconstrained(..)", () => {
+    // Setup: Deploy the oracle and submit a question
+    beforeAll(async () => {
+      // Deploy the oracle
+      oracle = await PrivateOracleContract.deploy(pxe).send().deployed();
+
+      // Submit a question
+      await oracle
+        .withWallet(requester)
+        .methods.submit_question(QUESTION, divinity.getAddress())
+        .send()
+        .wait();
+
+      // Submit an answer
+      await oracle
+        .withWallet(divinity)
+        .methods.submit_answer(QUESTION, requester.getAddress(), ANSWER)
+        .send()
+        .wait();
+    }, 30_000);
+
+    it("get_answer returns the correct answer to the requester", async () => {
+      // Get the answer
+      // Using "from" authentification (follow https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/pxe/src/pxe_service/pxe_service.ts#L337)
+      const answer = await oracle
+        .withWallet(requester)
+        .methods.get_answer_unconstrained(QUESTION, requester.getAddress())
+        .view({ from: requester.getAddress() });
+
+      // Check: Compare the answer with the expected value
+      expect(answer.request).toEqual(QUESTION);
+      expect(answer.answer).toEqual(ANSWER);
+      expect(AztecAddress.fromBigInt(answer.owner)).toEqual(
+        requester.getAddress()
+      );
+    });
+
+    it("get_answer returns the correct answer to the divinity", async () => {
+      // Get the answer
+      // Using "from" authentification (follow https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/pxe/src/pxe_service/pxe_service.ts#L337)
+      const answer = await oracle
+        .withWallet(divinity)
+        .methods.get_answer_unconstrained(QUESTION, divinity.getAddress())
+        .view({ from: divinity.getAddress() });
+
+      // Check: Compare the answer with the expected value
+      expect(answer.request).toEqual(QUESTION);
+      expect(answer.answer).toEqual(ANSWER);
+      expect(AztecAddress.fromBigInt(answer.owner)).toEqual(
+        divinity.getAddress()
+      );
     });
   });
 });

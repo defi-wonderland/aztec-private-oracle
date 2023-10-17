@@ -64,6 +64,8 @@ contract PrivateOracle {
     };
     use dep::aztec::selector::compute_selector;
     use dep::aztec::types::type_serialization::field_serialization::{ FieldSerializationMethods, FIELD_SERIALIZED_LEN};
+
+    use dep::aztec::types::address::AztecAddress;
     
     use dep::aztec::types::address::AztecAddress;
     use dep::aztec::types::type_serialization::aztec_address_serialization::{AztecAddressSerializationMethods, AZTEC_ADDRESS_SERIALIZED_LEN};
@@ -114,13 +116,13 @@ contract PrivateOracle {
 
     // Requester submit a question
     #[aztec(private)]
-    fn submit_question(question: Field, divinity_address: Field) {
+    fn submit_question(question: Field, divinity_address: AztecAddress) {
         let storage = Storage::init(Context::private(&mut context));
-        let address_this = context.this_address();
-        let sender = context.msg_sender();
+        let address_this = AztecAddress::new(context.this_address());
+        let sender = AztecAddress::new(context.msg_sender());
 
         // Assert if question doesn't already exist from the same requester
-        let question_getter_option = NoteGetterOptions::new().select(0, question).select(1, sender).set_limit(1);
+        let question_getter_option = NoteGetterOptions::new().select(0, question).select(1, sender.address).set_limit(1);
         let question_note = storage.questions.get_notes(question_getter_option)[0];
 
         assert(question_note.is_none());
@@ -141,34 +143,34 @@ contract PrivateOracle {
         // Encrypt/send the question to the requester notes - todo: we might remove this event later, as the requester doesn't need to read the note (only contract)
         emit_encrypted_log(
             &mut context,
-            address_this,
+            address_this.address,
             QUESTION_SET_SLOT,
-            get_public_key(sender),
+            get_public_key(sender.address),
             new_question.serialize(),
         );
 
         // Encrypt/send the question in the divinity notes
         emit_encrypted_log(
             &mut context,
-            address_this,
+            address_this.address,
             QUESTION_SET_SLOT,
-            get_public_key(divinity_address),
+            get_public_key(divinity_address.address),
             new_question.serialize(),
         ); 
     }
 
     // Divinity submit an answer to a given question
     #[aztec(private)]
-    fn submit_answer(question: Field, requester: Field, answer: Field) { 
+    fn submit_answer(question: Field, requester: AztecAddress, answer: Field) { 
         let storage = Storage::init(Context::private(&mut context));
-        let divinity_calling = context.msg_sender();
-        let address_this = context.this_address();
+        let divinity_calling = AztecAddress::new(context.msg_sender());
+        let address_this = AztecAddress::new(context.this_address());
 
         // Filter request note to check if existing and accesible for this divinity
         let request_filter = NoteGetterOptions::new()
             .select(0, question)
-            .select(1, requester)
-            .select(2, divinity_calling)
+            .select(1, requester.address)
+            .select(2, divinity_calling.address)
             .set_limit(1);
         
         // Get the question note
@@ -180,7 +182,7 @@ contract PrivateOracle {
         // Check if this question was previously answered
         let answerFilter = NoteGetterOptions::new()
             .select(0, question)
-            .select(2, divinity_calling)
+            .select(2, divinity_calling.address)
             .set_limit(1);
         
         let stored_answer_note = storage.answers.get_notes(answerFilter)[0];
@@ -203,9 +205,9 @@ contract PrivateOracle {
             // Encrypt the answer in the oracle notes
             emit_encrypted_log(
                 &mut context,
-                address_this,
+                address_this.address,
                 ANSWER_SET_SLOT,
-                get_public_key(divinity_calling),
+                get_public_key(divinity_calling.address),
                 new_answer_note_for_divinity.serialize(),
             );
         }
@@ -231,11 +233,11 @@ contract PrivateOracle {
         storage.answers.insert(&mut new_answer_note_for_requester);
 
         // Send the note to the requester (divinity already has the answer)
-        let requester_pub_key = get_public_key(request.unwrap_unchecked().requester_address);
+        let requester_pub_key = get_public_key(request.unwrap_unchecked().requester_address.address);
 
         emit_encrypted_log(
             &mut context,
-            address_this,
+            address_this.address,
             ANSWER_SET_SLOT,
             requester_pub_key,
             new_answer_note_for_requester.serialize(),
@@ -250,10 +252,10 @@ contract PrivateOracle {
     #[aztec(private)]
     fn consult_answer(question: Field) -> Field {
         let storage = Storage::init(Context::private(&mut context));
-        let caller = context.msg_sender();
+        let caller = AztecAddress::new(context.msg_sender());
         
         // create the answer_getter_option: select answer and limit
-        let answer_getter_option = NoteGetterOptions::new().select(0, question).select(2, caller).set_limit(1);
+        let answer_getter_option = NoteGetterOptions::new().select(0, question).select(2, caller.address).set_limit(1);
 
         // filter the notes - get_notes returns the note **that the account has access to** (if not, add it to the Option)
         let answered_note = storage.answers.get_notes(answer_getter_option)[0].unwrap_unchecked();
@@ -266,10 +268,10 @@ contract PrivateOracle {
     #[aztec(private)]
     fn cancel_question(question: Field) {
         let storage = Storage::init(Context::private(&mut context));
-        let caller = context.msg_sender();
+        let caller = AztecAddress::new(context.msg_sender());
 
         // create the Answer_getter_option: SELECT by address and max number of requests
-        let question_getter_option = NoteGetterOptions::new().select(0, question).select(1, caller).set_limit(1);
+        let question_getter_option = NoteGetterOptions::new().select(0, question).select(1, caller.address).set_limit(1);
         let question_note = storage.questions.get_notes(question_getter_option)[0].unwrap_unchecked();
 
         // nullify the note
@@ -285,13 +287,13 @@ contract PrivateOracle {
     // Get the answer to a question - unconstrained. Returns all answers to the same questions, from all the divinities
     // Obviously, only the question from the sender can be read
     // Keeping a requester arg to remind of this unconstrained nature (ts .view has a from option as  an alternative)
-    unconstrained fn get_answer_unconstrained(question: Field, requester: Field) -> AnswerNote {
+    unconstrained fn get_answer_unconstrained(question: Field, requester: AztecAddress) -> AnswerNote {
     // MAX_NOTES_PER_PAGE == 10
     // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
 
     //TODO: paginate
         // create the filter
-        let answer_getter_option = NoteViewerOptions::new().select(0, question).select(2, requester).set_limit(1);
+        let answer_getter_option = NoteViewerOptions::new().select(0, question).select(2, requester.address).set_limit(1);
 
         // filter the notes and return the answer-
         storage.answers.view_notes(answer_getter_option)[0].unwrap_unchecked()

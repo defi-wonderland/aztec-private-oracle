@@ -64,8 +64,6 @@ contract PrivateOracle {
     };
     use dep::aztec::selector::compute_selector;
     use dep::aztec::types::type_serialization::field_serialization::{ FieldSerializationMethods, FIELD_SERIALIZED_LEN};
-
-    use dep::aztec::types::address::AztecAddress;
     
     use dep::aztec::types::address::AztecAddress;
     use dep::aztec::types::type_serialization::aztec_address_serialization::{AztecAddressSerializationMethods, AZTEC_ADDRESS_SERIALIZED_LEN};

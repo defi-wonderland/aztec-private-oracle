@@ -358,39 +358,6 @@ describe("E2E Private Oracle", () => {
     });
   });
 
-  describe("consult_answer(..)", () => {
-    // Setup: Deploy the oracle and submit a question
-    beforeAll(async () => {
-      // Deploy the oracle
-      oracle = await PrivateOracleContract.deploy(pxe).send().deployed();
-
-      // Submit a question
-      await oracle
-        .withWallet(requester)
-        .methods.submit_question(QUESTION, divinity.getAddress())
-        .send()
-        .wait();
-
-      // Submit an answer
-      await oracle
-        .withWallet(divinity)
-        .methods.submit_answer(QUESTION, requester.getAddress(), ANSWER)
-        .send()
-        .wait();
-    }, 30_000);
-
-    it("consult_answer returns the correct answer", async () => {
-      // // Get the answer
-      // const answer = await oracle
-      //   .withWallet(requester)
-      //   .methods.consult_answer(QUESTION)
-      //   .send()
-      //   .wait();
-      // // Check: Compare the answer with the expected value
-      // expect(answer).toEqual(ANSWER);
-    });
-  });
-
   describe("unconstrained: get_answer_unconstrained(..)", () => {
     // Setup: Deploy the oracle and submit a question
     beforeAll(async () => {

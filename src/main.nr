@@ -217,6 +217,7 @@ contract PrivateOracle {
     }
 
     // Requester consults the answer to one of their questions
+    // Onchain use - see the unconstrained get_answer_unconstrained(..) infra for frontend integration
     #[aztec(private)]
     fn consult_answer(question: Field) -> Field {
         let storage = Storage::init(Context::private(&mut context));
@@ -244,6 +245,21 @@ contract PrivateOracle {
 
         // nullify the note
         storage.questions.remove(question_note);
+    }
+
+    // Get the answer to a question - unconstrained. Returns all answers to the same questions, from all the divinities
+    // Obviously, only the question from the sender can be read
+    // Keeping a requester arg to remind of this unconstrained nature (ts .view has a from option as  an alternative)
+    unconstrained fn get_answer_unconstrained(question: Field, requester: Field) -> AnswerNote {
+    // MAX_NOTES_PER_PAGE == 10
+    // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
+
+    //TODO: paginate
+        // create the filter
+        let answer_getter_option = NoteViewerOptions::new().select(0, question).select(2, requester).set_limit(1);
+
+        // filter the notes and return the answer-
+        storage.answers.view_notes(answer_getter_option)[0].unwrap_unchecked()
     }
 
     // Computes note hash and nullifier.

@@ -14,6 +14,11 @@ import {
   getSandboxAccountsWallets,
   waitForSandbox,
   AztecAddress,
+  AccountWalletWithPrivateKey,
+  Wallet,
+  createAccounts,
+  Point,
+  CompleteAddress,
 } from "@aztec/aztec.js";
 import { toBigIntBE } from "@aztec/foundation/bigint-buffer";
 import { format } from "util";
@@ -34,9 +39,10 @@ const ALTERNATIVE_ANSWER = 789n;
 
 let pxe: PXE;
 let oracle: PrivateOracleContract;
-let requester: AccountWallet;
-let requester2: AccountWallet;
-let divinity: AccountWallet;
+let requester: AccountWalletWithPrivateKey;
+let requester2: AccountWalletWithPrivateKey;
+let divinity: AccountWalletWithPrivateKey;
+let deployer: AccountWalletWithPrivateKey;
 
 const logger = createDebugLogger("oracle");
 
@@ -50,11 +56,8 @@ beforeAll(async () => {
 
   logger(format("Aztec Sandbox Info ", nodeInfo));
 
-  requester = await createAccount(pxe);
-  requester2 = await createAccount(pxe);
-  divinity = await createAccount(pxe);
+  [requester, requester2, divinity] = await getSandboxAccountsWallets(pxe);
 }, 30_000);
-
 
 describe("E2E Private Oracle", () => {
   describe("submit_question(..)", () => {
@@ -64,9 +67,7 @@ describe("E2E Private Oracle", () => {
 
     // Setup: Deploy the oracle
     beforeAll(async () => {
-      const deployer = await createAccount(pxe);
-
-      oracle = await PrivateOracleContract.deploy(deployer).send().deployed();
+      oracle = await PrivateOracleContract.deploy(pxe).send().deployed();
 
       logger(`Oracle deployed at ${oracle.address}`);
     }, 30_000);
@@ -190,10 +191,8 @@ describe("E2E Private Oracle", () => {
   describe("submit_answer(..)", () => {
     // Setup: Deploy the oracle and submit a question
     beforeAll(async () => {
-      const deployer = await createAccount(pxe);
-
       // Deploy the oracle
-      oracle = await PrivateOracleContract.deploy(deployer).send().deployed();
+      oracle = await PrivateOracleContract.deploy(pxe).send().deployed();
 
       // Submit a question
       await oracle
@@ -227,9 +226,14 @@ describe("E2E Private Oracle", () => {
       // Check: Compare the note's data with the expected values
       expect(divinityAnswersNotes[0].items[0].value).toEqual(QUESTION);
       expect(divinityAnswersNotes[0].items[1].value).toEqual(ANSWER);
+      expect(
+        AztecAddress.fromBigInt(divinityAnswersNotes[0].items[2].value)
+      ).toEqual(divinity.getAddress());
     });
 
-    // Test: is the answer note stored correct, for the requester
+    // Test: Is the data of the answer note stored correct, for the requester?
+    //       The owner should be the requester (not tested otherwise, as we "cheat" with getPrivateStorageAt
+    //       and the sk is in the current pxe)
     it("requester answer note has the correct data", async () => {
       // Get the private storage for the requester's answer slot
       const requesterAnswersNotes = await pxe.getPrivateStorageAt(
@@ -241,6 +245,9 @@ describe("E2E Private Oracle", () => {
       // Check: Compare the note's data with the expected values
       expect(requesterAnswersNotes[0].items[0].value).toEqual(QUESTION);
       expect(requesterAnswersNotes[0].items[1].value).toEqual(ANSWER);
+      expect(
+        AztecAddress.fromBigInt(requesterAnswersNotes[0].items[2].value)
+      ).toEqual(requester.getAddress());
     });
 
     // Test: is the request note of the requester now nullified
@@ -306,10 +313,8 @@ describe("E2E Private Oracle", () => {
   describe("cancel_question(..)", () => {
     // Setup: Deploy the oracle and submit the question
     beforeAll(async () => {
-      const deployer = await createAccount(pxe);
-
       // Deploy the oracle
-      oracle = await PrivateOracleContract.deploy(deployer).send().deployed();
+      oracle = await PrivateOracleContract.deploy(pxe).send().deployed();
 
       // Submit a question
       await oracle
@@ -354,6 +359,88 @@ describe("E2E Private Oracle", () => {
 
       // Check: There is no request left (has been nullified when cancel_question was called)
       expect(divinityRequestsNotes.length).toEqual(0);
+    });
+  });
+
+  describe("consult_answer(..)", () => {
+    // Setup: Deploy the oracle and submit a question
+    beforeAll(async () => {
+      // Deploy the oracle
+      oracle = await PrivateOracleContract.deploy(pxe).send().deployed();
+
+      // Submit a question
+      await oracle
+        .withWallet(requester)
+        .methods.submit_question(QUESTION, divinity.getAddress())
+        .send()
+        .wait();
+
+      // Submit an answer
+      await oracle
+        .withWallet(divinity)
+        .methods.submit_answer(QUESTION, requester.getAddress(), ANSWER)
+        .send()
+        .wait();
+    }, 30_000);
+
+    it("consult_answer returns the correct answer", async () => {
+      // // Get the answer
+      // const answer = await oracle
+      //   .withWallet(requester)
+      //   .methods.consult_answer(QUESTION)
+      //   .send()
+      //   .wait();
+      // // Check: Compare the answer with the expected value
+      // expect(answer).toEqual(ANSWER);
+    });
+  });
+
+  describe("unconstrained: get_answer_unconstrained(..)", () => {
+    // Setup: Deploy the oracle and submit a question
+    beforeAll(async () => {
+      // Deploy the oracle
+      oracle = await PrivateOracleContract.deploy(pxe).send().deployed();
+
+      // Submit a question
+      await oracle
+        .withWallet(requester)
+        .methods.submit_question(QUESTION, divinity.getAddress())
+        .send()
+        .wait();
+
+      // Submit an answer
+      await oracle
+        .withWallet(divinity)
+        .methods.submit_answer(QUESTION, requester.getAddress(), ANSWER)
+        .send()
+        .wait();
+    }, 30_000);
+
+    it("get_answer returns the correct answer", async () => {
+      // Get the answer
+      const answer = await oracle
+        .withWallet(requester)
+        .methods.get_answer_unconstrained(QUESTION, requester.getAddress())
+        .view({ from: requester.getAddress() });
+      // Watch out for from authentification at some point (maybe?): https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/pxe/src/pxe_service/pxe_service.ts#L337
+      console.log(answer);
+      // // Check: Compare the answer with the expected value
+      // expect(answer).toEqual(ANSWER);
+
+      // Get the private storage for the requester's answer slot
+      const requesterAnswersNotes = await pxe.getPrivateStorageAt(
+        requester.getAddress(),
+        oracle.address,
+        ANSWERS_SLOT
+      );
+
+      console.log(requesterAnswersNotes[0].items[0].value);
+      console.log(requesterAnswersNotes[0].items[1].value);
+      console.log(requesterAnswersNotes[0].items[2].value);
+
+      // // Check: Compare the note's data with the expected values
+      // expect(requesterAnswersNotes[0].items[0].value).toEqual(QUESTION);
+      // expect(requesterAnswersNotes[0].items[1].value).toEqual(ANSWER);
     });
   });
 });

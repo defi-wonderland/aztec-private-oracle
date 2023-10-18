@@ -17,11 +17,13 @@ import {
   AccountWalletWithPrivateKey,
   EthAddress,
   computeAuthWitMessageHash,
+  TxHash,
 } from "@aztec/aztec.js";
 import { toBigIntBE } from "@aztec/foundation/bigint-buffer";
 import { format } from "util";
 
-import { TokenContract } from "@aztec/noir-contracts/types";
+// import { TokenContract } from "@aztec/noir-contracts/types";
+import { TokenContract } from "../../token/Token.js";
 import { PrivateOracleContract } from "../../types/PrivateOracle.js";
 
 const {
@@ -49,6 +51,12 @@ let deployer: AccountWalletWithPrivateKey;
 
 const logger = createDebugLogger("oracle");
 
+const addPendingShieldNoteToPXE = async (account: AccountWalletWithPrivateKey, amount: bigint, secretHash: Fr, txHash: TxHash) => {
+  const storageSlot = new Fr(5); // The storage slot of `pending_shields` is 5.
+  const preimage = new NotePreimage([new Fr(amount), secretHash]);
+  await account.addNote(account.getAddress(), token.address, storageSlot, preimage, txHash);
+};
+
 // Setup: Set the sandbox
 beforeAll(async () => {
   const { SANDBOX_URL = "http://localhost:8080" } = process.env;
@@ -74,9 +82,11 @@ describe("E2E Private Oracle", () => {
       token = await TokenContract.deploy(pxe, requester.getAddress()).send().deployed();
 
       // Mint tokens
-      let secret = Fr.random();
-      let secretHash = await computeMessageSecretHash(secret);
-      await token.withWallet(requester).methods.mint_private(MINT_AMOUNT, secretHash).send().wait();
+      const secret = Fr.random();
+      const secretHash = await computeMessageSecretHash(secret);
+      const recipt = await token.withWallet(requester).methods.mint_private(MINT_AMOUNT, secretHash).send().wait();
+      await addPendingShieldNoteToPXE(requester, MINT_AMOUNT, secretHash, recipt.txHash);
+
       await token.withWallet(requester).methods.redeem_shield(requester.getAddress(), MINT_AMOUNT, secret).send().wait();
 
       // Deploy the oracle
@@ -435,7 +445,7 @@ describe("E2E Private Oracle", () => {
         .methods.get_answer_unconstrained(QUESTION, divinity.getAddress())
         .view({ from: divinity.getAddress() });
 
-        // Check: Compare the answer with the expected value
+      // Check: Compare the answer with the expected value
       expect(answer.request).toEqual(QUESTION);
       expect(answer.answer).toEqual(ANSWER);
       expect(AztecAddress.fromBigInt(answer.owner.address)).toEqual(

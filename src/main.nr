@@ -108,16 +108,28 @@ contract PrivateOracle {
     // Constructs the contract.
     #[aztec(private)]
     fn constructor(payment_token: AztecAddress, fee: Field) {
-        let selector = compute_selector("_initialize(Field,Field)");
+        let selector = compute_selector("_initialize((Field),Field)");
         context.call_public_function(context.this_address(), selector, [payment_token.address,fee]);
     }
 
     // Requester submit a question
     #[aztec(private)]
-    fn submit_question(question: Field, divinity_address: AztecAddress) {
-        let storage = Storage::init(Context::private(&mut context));
+    fn submit_question(question: Field, divinity_address: AztecAddress, nonce: Field) {
+        let payment_token = payment_token();
+        let fee = fee();
         let address_this = AztecAddress::new(context.this_address());
         let sender = AztecAddress::new(context.msg_sender());
+
+        // Take the payment from the user
+        let _return_values = context.call_private_function(
+            payment_token,
+            compute_selector("transfer((Field),(Field),Field,Field)"),
+            // from: AztecAddress,
+            // to: AztecAddress,
+            // amount: Field,
+            // nonce: Field
+            [sender.address, address_this.address, fee, nonce]
+        );
 
         // Assert if question doesn't already exist from the same requester
         let question_getter_option = NoteGetterOptions::new().select(0, question).select(1, sender.address).set_limit(1);
@@ -160,7 +172,8 @@ contract PrivateOracle {
     // Divinity submit an answer to a given question
     #[aztec(private)]
     fn submit_answer(question: Field, requester: AztecAddress, answer: Field) { 
-        let storage = Storage::init(Context::private(&mut context));
+        let payment_token = payment_token();
+        let fee = fee();
         let divinity_calling = AztecAddress::new(context.msg_sender());
         let address_this = AztecAddress::new(context.this_address());
 
@@ -243,6 +256,17 @@ contract PrivateOracle {
 
         // Nullify the question note (will nullify both divinity and requester notes, via the shared key)
         storage.questions.remove(request.unwrap_unchecked());
+
+        // Pay the divinity
+        let _return_values = context.call_private_function(
+            payment_token,
+            compute_selector("transfer((Field),(Field),Field,Field)"),
+            // from: AztecAddress,
+            // to: AztecAddress,
+            // amount: Field,
+            // nonce: Field
+            [address_this.address, divinity_calling.address, fee, 0]
+        );
     }
 
     // Requester consults the answer to one of their questions
@@ -265,8 +289,10 @@ contract PrivateOracle {
     // Requester cancels a question - no real utility here, will be usefull when request bound an amount, waiting for the answer
     #[aztec(private)]
     fn cancel_question(question: Field) {
-        let storage = Storage::init(Context::private(&mut context));
+        let payment_token = payment_token();
+        let fee = fee();
         let caller = AztecAddress::new(context.msg_sender());
+        let address_this = AztecAddress::new(context.this_address());
 
         // create the Answer_getter_option: SELECT by address and max number of requests
         let question_getter_option = NoteGetterOptions::new().select(0, question).select(1, caller.address).set_limit(1);
@@ -274,6 +300,17 @@ contract PrivateOracle {
 
         // nullify the note
         storage.questions.remove(question_note);
+
+        // Return funds to user
+        let _return_values = context.call_private_function(
+            payment_token,
+            compute_selector("transfer((Field),(Field),Field,Field)"),
+            // from: AztecAddress,
+            // to: AztecAddress,
+            // amount: Field,
+            // nonce: Field
+            [address_this.address, caller.address, fee, 0]
+        );
     }
 
     #[aztec(public)]
@@ -295,6 +332,16 @@ contract PrivateOracle {
 
         // filter the notes and return the answer-
         storage.answers.view_notes(answer_getter_option)[0].unwrap_unchecked()
+    }
+
+    // Returns the fee
+    unconstrained fn fee() -> Field {
+        storage.fee.read()
+    }
+
+    // Returns the payment token
+    unconstrained fn payment_token() -> Field {
+        storage.payment_token.read().address
     }
 
     // Computes note hash and nullifier.

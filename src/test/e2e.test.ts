@@ -16,10 +16,12 @@ import {
   AztecAddress,
   AccountWalletWithPrivateKey,
   EthAddress,
+  computeAuthWitMessageHash,
 } from "@aztec/aztec.js";
 import { toBigIntBE } from "@aztec/foundation/bigint-buffer";
 import { format } from "util";
 
+import { TokenContract } from "@aztec/noir-contracts/types";
 import { PrivateOracleContract } from "../../types/PrivateOracle.js";
 
 const {
@@ -34,14 +36,16 @@ const QUESTION = 123n;
 const ANSWER = 456n;
 const ALTERNATIVE_ANSWER = 789n;
 const FEE = 1000n;
+const MINT_AMOUNT = 10000n;
 
 let pxe: PXE;
 let oracle: PrivateOracleContract;
+let token: TokenContract;
+
 let requester: AccountWalletWithPrivateKey;
 let requester2: AccountWalletWithPrivateKey;
 let divinity: AccountWalletWithPrivateKey;
 let deployer: AccountWalletWithPrivateKey;
-let token: AztecAddress;
 
 const logger = createDebugLogger("oracle");
 
@@ -56,7 +60,6 @@ beforeAll(async () => {
   logger(format("Aztec Sandbox Info ", nodeInfo));
 
   [requester, requester2, divinity] = await getSandboxAccountsWallets(pxe);
-  token = requester.getAddress();
 }, 30_000);
 
 describe("E2E Private Oracle", () => {
@@ -67,17 +70,33 @@ describe("E2E Private Oracle", () => {
 
     // Setup: Deploy the oracle
     beforeAll(async () => {
-      oracle = await PrivateOracleContract.deploy(pxe, token, FEE).send().deployed();
+      // Deploy the token
+      token = await TokenContract.deploy(pxe, requester.getAddress()).send().deployed();
+
+      // Mint tokens
+      let secret = Fr.random();
+      let secretHash = await computeMessageSecretHash(secret);
+      await token.withWallet(requester).methods.mint_private(MINT_AMOUNT, secretHash).send().wait();
+      await token.withWallet(requester).methods.redeem_shield(requester.getAddress(), MINT_AMOUNT, secret).send().wait();
+
+      // Deploy the oracle
+      oracle = await PrivateOracleContract.deploy(pxe, token.address, FEE).send().deployed();
 
       logger(`Oracle deployed at ${oracle.address}`);
     }, 30_000);
 
+    it("Requester has tokens", async () => {
+      let requesterBalance = await token.withWallet(requester).methods.balance_of_private(requester.getAddress()).view();
+      expect(requesterBalance).toEqual(MINT_AMOUNT);
+    });
+
     // Test: is the tx successful
     it("Tx to submit_question is mined", async () => {
+      const nonce = await createAuthMessage(token, requester, oracle.address, FEE);
       // Submit the question
       const receipt = await oracle
         .withWallet(requester)
-        .methods.submit_question(QUESTION, divinity.getAddress())
+        .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
         .send()
         .wait();
 
@@ -138,10 +157,11 @@ describe("E2E Private Oracle", () => {
     // Test: creating a new question with the same parameters (from a different requester) is possible
     //       and will have a different nullifier shared key
     it("another requester can ask the same question and will get a different nullifier shared key", async () => {
+      const nonce = await createAuthMessage(token, requester2, oracle.address, FEE);
       // Submit the question
       await oracle
         .withWallet(requester2)
-        .methods.submit_question(QUESTION, divinity.getAddress())
+        .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
         .send()
         .wait();
 
@@ -192,12 +212,14 @@ describe("E2E Private Oracle", () => {
     // Setup: Deploy the oracle and submit a question
     beforeAll(async () => {
       // Deploy the oracle
-      oracle = await PrivateOracleContract.deploy(pxe, token, FEE).send().deployed();
+      oracle = await PrivateOracleContract.deploy(pxe, token.address, FEE).send().deployed();
+
+      const nonce = await createAuthMessage(token, requester, oracle.address, FEE);
 
       // Submit a question
       await oracle
         .withWallet(requester)
-        .methods.submit_question(QUESTION, divinity.getAddress())
+        .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
         .send()
         .wait();
     }, 30_000);
@@ -279,10 +301,12 @@ describe("E2E Private Oracle", () => {
     // Test: if a second request is made from a different requester, asking the same question, is the divinity
     //       forced to answer with the same answer (answer consistency)?
     it("second identical question cannot have a different answer (from the same divinity)", async () => {
+      const nonce = await createAuthMessage(token, requester2, oracle.address, FEE);
+
       // Setup: submit the same question from a second requester
       await oracle
         .withWallet(requester2)
-        .methods.submit_question(QUESTION, divinity.getAddress())
+        .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
         .send()
         .wait();
 
@@ -314,12 +338,14 @@ describe("E2E Private Oracle", () => {
     // Setup: Deploy the oracle and submit the question
     beforeAll(async () => {
       // Deploy the oracle
-      oracle = await PrivateOracleContract.deploy(pxe, token, FEE).send().deployed();
+      oracle = await PrivateOracleContract.deploy(pxe, token.address, FEE).send().deployed();
+
+      const nonce = await createAuthMessage(token, requester, oracle.address, FEE);
 
       // Submit a question
       await oracle
         .withWallet(requester)
-        .methods.submit_question(QUESTION, divinity.getAddress())
+        .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
         .send()
         .wait();
     }, 30_000);
@@ -366,12 +392,14 @@ describe("E2E Private Oracle", () => {
     // Setup: Deploy the oracle and submit a question
     beforeAll(async () => {
       // Deploy the oracle
-      oracle = await PrivateOracleContract.deploy(pxe, token, FEE).send().deployed();
+      oracle = await PrivateOracleContract.deploy(pxe, token.address, FEE).send().deployed();
+
+      const nonce = await createAuthMessage(token, requester, oracle.address, FEE);
 
       // Submit a question
       await oracle
         .withWallet(requester)
-        .methods.submit_question(QUESTION, divinity.getAddress())
+        .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
         .send()
         .wait();
 
@@ -407,7 +435,7 @@ describe("E2E Private Oracle", () => {
         .methods.get_answer_unconstrained(QUESTION, divinity.getAddress())
         .view({ from: divinity.getAddress() });
 
-      // Check: Compare the answer with the expected value
+        // Check: Compare the answer with the expected value
       expect(answer.request).toEqual(QUESTION);
       expect(answer.answer).toEqual(ANSWER);
       expect(AztecAddress.fromBigInt(answer.owner.address)).toEqual(
@@ -416,3 +444,18 @@ describe("E2E Private Oracle", () => {
     });
   });
 });
+
+const createAuthMessage = async (token: TokenContract, from: AccountWalletWithPrivateKey, to: AztecAddress, amount: any) => {
+  const nonce = Fr.random();
+
+  // We need to compute the message we want to sign and add it to the wallet as approved
+  const action = token.methods.transfer(from.getAddress(), to, amount, nonce);
+  const messageHash = await computeAuthWitMessageHash(to, action.request());
+
+  // Both wallets are connected to same node and PXE so we could just insert directly using
+  // await wallet.signAndAddAuthWitness(messageHash, );
+  // But doing it in two actions to show the flow.
+  const witness = await from.createAuthWitness(messageHash);
+  await from.addAuthWitness(witness);
+  return nonce;
+}

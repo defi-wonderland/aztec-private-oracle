@@ -194,21 +194,25 @@ contract PrivateOracle {
         // Check if this question was previously answered
         let answerFilter = NoteGetterOptions::new()
             .select(0, question)
-            .select(2, divinity_calling.address)
+            .select(3, divinity_calling.address)
             .set_limit(1);
-        
+
         let stored_answer_note = storage.answers.get_notes(answerFilter)[0];
 
         // Create new notes for both sides
         let mut new_answer_note_for_requester: AnswerNote = AnswerNote::new(
             question,
             answer,
+            requester,
+            divinity_calling,
             requester
         );
 
         let mut new_answer_note_for_divinity: AnswerNote = AnswerNote::new(
             question,
             answer,
+            requester,
+            divinity_calling,
             divinity_calling
         );
 
@@ -229,12 +233,16 @@ contract PrivateOracle {
             new_answer_note_for_requester = AnswerNote::new(
                 question,
                 stored_answer_note.unwrap_unchecked().answer,
+                requester,
+                divinity_calling,
                 requester
             );
 
             new_answer_note_for_divinity = AnswerNote::new(
                 question,
                 stored_answer_note.unwrap_unchecked().answer,
+                requester,
+                divinity_calling,
                 divinity_calling
             );
         }
@@ -278,7 +286,7 @@ contract PrivateOracle {
         let caller = AztecAddress::new(context.msg_sender());
         
         // create the answer_getter_option: select answer and limit
-        let answer_getter_option = NoteGetterOptions::new().select(0, question).select(2, caller.address).set_limit(1);
+        let answer_getter_option = NoteGetterOptions::new().select(0, question).select(4, caller.address).set_limit(1);
 
         // filter the notes - get_notes returns the note **that the account has access to** (if not, add it to the Option)
         let answered_note = storage.answers.get_notes(answer_getter_option)[0].unwrap_unchecked();
@@ -316,14 +324,13 @@ contract PrivateOracle {
 
     // Get the answer to a question - unconstrained. Returns all answers to the same questions, from all the divinities
     // Obviously, only the question from the sender can be read
-    // Keeping a requester arg to remind of this unconstrained nature (ts .view has a from option as  an alternative)
-    unconstrained fn get_answer_unconstrained(question: Field, requester: AztecAddress) -> AnswerNote {
+    unconstrained fn get_answer_unconstrained(question: Field, note_owner: AztecAddress) -> AnswerNote {
     // MAX_NOTES_PER_PAGE == 10
     // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
 
     //TODO: paginate
         // create the filter
-        let answer_getter_option = NoteViewerOptions::new().select(0, question).select(2, requester.address).set_limit(1);
+        let answer_getter_option = NoteViewerOptions::new().select(0, question).select(4, note_owner.address).set_limit(1);
 
         // filter the notes and return the answer-
         storage.answers.view_notes(answer_getter_option)[0].unwrap_unchecked()
@@ -340,7 +347,7 @@ contract PrivateOracle {
     // }
 
     // Computes note hash and nullifier.
-    unconstrained fn compute_note_hash_and_nullifier(contract_address: Field, nonce: Field, storage_slot: Field, preimage: [Field; QUESTION_NOTE_LEN]) -> [Field; 4] {
+    unconstrained fn compute_note_hash_and_nullifier(contract_address: Field, nonce: Field, storage_slot: Field, preimage: [Field; ANSWER_NOTE_LEN]) -> [Field; 4] {
         let note_header = NoteHeader::new(contract_address, nonce, storage_slot);
 
         if(storage_slot == QUESTION_SET_SLOT) {

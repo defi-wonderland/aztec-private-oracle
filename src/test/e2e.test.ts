@@ -260,6 +260,12 @@ describe("E2E Private Oracle", () => {
       expect(divinityAnswersNotes[0].items[1].value).toEqual(ANSWER);
       expect(
         AztecAddress.fromBigInt(divinityAnswersNotes[0].items[2].value)
+      ).toEqual(requester.getAddress());
+      expect(
+        AztecAddress.fromBigInt(divinityAnswersNotes[0].items[3].value)
+      ).toEqual(divinity.getAddress());
+      expect(
+        AztecAddress.fromBigInt(divinityAnswersNotes[0].items[4].value)
       ).toEqual(divinity.getAddress());
     });
 
@@ -279,6 +285,12 @@ describe("E2E Private Oracle", () => {
       expect(requesterAnswersNotes[0].items[1].value).toEqual(ANSWER);
       expect(
         AztecAddress.fromBigInt(requesterAnswersNotes[0].items[2].value)
+      ).toEqual(requester.getAddress());
+      expect(
+        AztecAddress.fromBigInt(requesterAnswersNotes[0].items[3].value)
+      ).toEqual(divinity.getAddress());
+      expect(
+        AztecAddress.fromBigInt(requesterAnswersNotes[0].items[4].value)
       ).toEqual(requester.getAddress());
     });
 
@@ -432,6 +444,12 @@ describe("E2E Private Oracle", () => {
       // Check: Compare the answer with the expected value
       expect(answer.request).toEqual(QUESTION);
       expect(answer.answer).toEqual(ANSWER);
+      expect(AztecAddress.fromBigInt(answer.requester.address)).toEqual(
+        requester.getAddress()
+      );
+      expect(AztecAddress.fromBigInt(answer.divinity.address)).toEqual(
+        divinity.getAddress()
+      );
       expect(AztecAddress.fromBigInt(answer.owner.address)).toEqual(
         requester.getAddress()
       );
@@ -448,6 +466,12 @@ describe("E2E Private Oracle", () => {
       // Check: Compare the answer with the expected value
       expect(answer.request).toEqual(QUESTION);
       expect(answer.answer).toEqual(ANSWER);
+      expect(AztecAddress.fromBigInt(answer.requester.address)).toEqual(
+        requester.getAddress()
+      );
+      expect(AztecAddress.fromBigInt(answer.divinity.address)).toEqual(
+        divinity.getAddress()
+      );
       expect(AztecAddress.fromBigInt(answer.owner.address)).toEqual(
         divinity.getAddress()
       );

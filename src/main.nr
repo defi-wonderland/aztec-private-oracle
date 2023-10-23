@@ -41,6 +41,7 @@ contract PrivateOracle {
     use crate::types::answer_note:: {AnswerNote, AnswerNoteMethods, ANSWER_NOTE_LEN};
     use crate::types::fee_note:: {FeeNote, FeeNoteMethods, FEE_NOTE_LEN};
     use crate::types::payment_token_note:: {PaymentTokenNote, PaymentTokenNoteMethods, PAYMENT_TOKEN_NOTE_LEN};
+    use crate::types::token::{TokenPrivateContextInterface, FromTransferStruct, ToTransferStruct};
 
     use dep::std::option::Option;
 
@@ -122,14 +123,12 @@ contract PrivateOracle {
         let sender = AztecAddress::new(context.msg_sender());
 
         // Take the payment from the user
-        let _return_values = context.call_private_function(
-            payment_token.address,
-            compute_selector("transfer((Field),(Field),Field,Field)"),
-            // from: AztecAddress,
-            // to: AztecAddress,
-            // amount: Field,
-            // nonce: Field
-            [sender.address, address_this.address, fee, nonce]
+        TokenPrivateContextInterface::at(payment_token.address).transfer(
+            &mut context, 
+            FromTransferStruct { address: sender.address }, 
+            ToTransferStruct { address: address_this.address }, 
+            fee, 
+            nonce
         );
 
         // Assert if question doesn't already exist from the same requester
@@ -267,14 +266,12 @@ contract PrivateOracle {
         storage.questions.remove(request.unwrap_unchecked());
 
         // Pay the divinity
-        let _return_values = context.call_private_function(
-            payment_token.address,
-            compute_selector("transfer((Field),(Field),Field,Field)"),
-            // from: AztecAddress,
-            // to: AztecAddress,
-            // amount: Field,
-            // nonce: Field
-            [address_this.address, divinity_calling.address, fee, 0]
+        TokenPrivateContextInterface::at(payment_token.address).transfer(
+            &mut context, 
+            FromTransferStruct { address: address_this.address }, 
+            ToTransferStruct { address: divinity_calling.address }, 
+            fee, 
+            0
         );
     }
 
@@ -311,14 +308,12 @@ contract PrivateOracle {
         storage.questions.remove(question_note);
 
         // Return funds to user
-        let _return_values = context.call_private_function(
-            payment_token.address,
-            compute_selector("transfer((Field),(Field),Field,Field)"),
-            // from: AztecAddress,
-            // to: AztecAddress,
-            // amount: Field,
-            // nonce: Field
-            [address_this.address, caller.address, fee, 0]
+        TokenPrivateContextInterface::at(payment_token.address).transfer(
+            &mut context, 
+            FromTransferStruct { address: address_this.address }, 
+            ToTransferStruct { address: caller.address }, 
+            fee, 
+            0
         );
     }
 

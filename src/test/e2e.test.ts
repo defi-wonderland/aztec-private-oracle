@@ -81,16 +81,17 @@ describe("E2E Private Oracle", () => {
       // Deploy the token
       token = await TokenContract.deploy(pxe, requester.getAddress()).send().deployed();
 
-      // Mint tokens
+      // Mint private tokens
       const secret = Fr.random();
       const secretHash = await computeMessageSecretHash(secret);
       const recipt = await token.withWallet(requester).methods.mint_private(MINT_AMOUNT, secretHash).send().wait();
       await addPendingShieldNoteToPXE(requester, MINT_AMOUNT, secretHash, recipt.txHash);
-
       await token.withWallet(requester).methods.redeem_shield(requester.getAddress(), MINT_AMOUNT, secret).send().wait();
 
       // Deploy the oracle
-      oracle = await PrivateOracleContract.deploy(pxe, token.address, FEE).send().deployed();
+      const receipt = PrivateOracleContract.deploy(pxe, token.address, FEE).send();
+      oracle = await receipt.deployed();
+      await addTokenAndFeeNotesToPXE(requester.getAddress(), oracle.address, token.address, FEE, await receipt.getTxHash());
 
       logger(`Oracle deployed at ${oracle.address}`);
     }, 30_000);
@@ -102,7 +103,7 @@ describe("E2E Private Oracle", () => {
 
     // Test: is the tx successful
     it("Tx to submit_question is mined", async () => {
-      const nonce = await createAuthMessage(token, requester, oracle.address, FEE);
+      const nonce = await createAuthUnshieldMessage(token, requester, oracle.address, FEE);
       // Submit the question
       const receipt = await oracle
         .withWallet(requester)
@@ -167,7 +168,7 @@ describe("E2E Private Oracle", () => {
     // Test: creating a new question with the same parameters (from a different requester) is possible
     //       and will have a different nullifier shared key
     it("another requester can ask the same question and will get a different nullifier shared key", async () => {
-      const nonce = await createAuthMessage(token, requester2, oracle.address, FEE);
+      const nonce = await createAuthUnshieldMessage(token, requester2, oracle.address, FEE);
       // Submit the question
       await oracle
         .withWallet(requester2)
@@ -222,9 +223,11 @@ describe("E2E Private Oracle", () => {
     // Setup: Deploy the oracle and submit a question
     beforeAll(async () => {
       // Deploy the oracle
-      oracle = await PrivateOracleContract.deploy(pxe, token.address, FEE).send().deployed();
+      const receipt = PrivateOracleContract.deploy(pxe, token.address, FEE).send();
+      oracle = await receipt.deployed();
+      await addTokenAndFeeNotesToPXE(requester.getAddress(), oracle.address, token.address, FEE, await receipt.getTxHash());
 
-      const nonce = await createAuthMessage(token, requester, oracle.address, FEE);
+      const nonce = await createAuthUnshieldMessage(token, requester, oracle.address, FEE);
 
       // Submit a question
       await oracle
@@ -323,7 +326,7 @@ describe("E2E Private Oracle", () => {
     // Test: if a second request is made from a different requester, asking the same question, is the divinity
     //       forced to answer with the same answer (answer consistency)?
     it("second identical question cannot have a different answer (from the same divinity)", async () => {
-      const nonce = await createAuthMessage(token, requester2, oracle.address, FEE);
+      const nonce = await createAuthUnshieldMessage(token, requester2, oracle.address, FEE);
 
       // Setup: submit the same question from a second requester
       await oracle
@@ -360,9 +363,11 @@ describe("E2E Private Oracle", () => {
     // Setup: Deploy the oracle and submit the question
     beforeAll(async () => {
       // Deploy the oracle
-      oracle = await PrivateOracleContract.deploy(pxe, token.address, FEE).send().deployed();
+      const receipt = PrivateOracleContract.deploy(pxe, token.address, FEE).send();
+      oracle = await receipt.deployed();
+      await addTokenAndFeeNotesToPXE(requester.getAddress(), oracle.address, token.address, FEE, await receipt.getTxHash());
 
-      const nonce = await createAuthMessage(token, requester, oracle.address, FEE);
+      const nonce = await createAuthUnshieldMessage(token, requester, oracle.address, FEE);
 
       // Submit a question
       await oracle
@@ -414,9 +419,12 @@ describe("E2E Private Oracle", () => {
     // Setup: Deploy the oracle and submit a question
     beforeAll(async () => {
       // Deploy the oracle
-      oracle = await PrivateOracleContract.deploy(pxe, token.address, FEE).send().deployed();
+      const receipt = PrivateOracleContract.deploy(pxe, token.address, FEE).send();
+      oracle = await receipt.deployed();
 
-      const nonce = await createAuthMessage(token, requester, oracle.address, FEE);
+      await addTokenAndFeeNotesToPXE(requester.getAddress(), oracle.address, token.address, FEE, await receipt.getTxHash());
+
+      const nonce = await createAuthUnshieldMessage(token, requester, oracle.address, FEE);
 
       // Submit a question
       await oracle
@@ -479,11 +487,11 @@ describe("E2E Private Oracle", () => {
   });
 });
 
-const createAuthMessage = async (token: TokenContract, from: AccountWalletWithPrivateKey, to: AztecAddress, amount: any) => {
+const createAuthUnshieldMessage = async (token: TokenContract, from: AccountWalletWithPrivateKey, to: AztecAddress, amount: any) => {
   const nonce = Fr.random();
 
   // We need to compute the message we want to sign and add it to the wallet as approved
-  const action = token.methods.transfer(from.getAddress(), to, amount, nonce);
+  const action = token.methods.unshield(from.getAddress(), to, amount, nonce);
   const messageHash = await computeAuthWitMessageHash(to, action.request());
 
   // Both wallets are connected to same node and PXE so we could just insert directly using
@@ -492,4 +500,24 @@ const createAuthMessage = async (token: TokenContract, from: AccountWalletWithPr
   const witness = await from.createAuthWitness(messageHash);
   await from.addAuthWitness(witness);
   return nonce;
+}
+
+const addTokenAndFeeNotesToPXE = async (requester: AztecAddress, oracle: AztecAddress, token: AztecAddress, fee: bigint, txHash: TxHash) => {
+  // Add note for the payment token
+  await pxe.addNote(
+    requester,
+    oracle,
+    new Fr(1), // The storage slot for the payment_token
+    new NotePreimage([token.toField()]),
+    txHash
+  );
+
+  // Add note for the fee
+  await pxe.addNote(
+    requester,
+    oracle,
+    new Fr(2), // The storage slot for the fee
+    new NotePreimage([new Fr(fee)]),
+    txHash
+  );
 }

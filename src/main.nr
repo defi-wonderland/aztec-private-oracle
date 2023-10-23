@@ -41,7 +41,7 @@ contract PrivateOracle {
     use crate::types::answer_note:: {AnswerNote, AnswerNoteMethods, ANSWER_NOTE_LEN};
     use crate::types::fee_note:: {FeeNote, FeeNoteMethods, FEE_NOTE_LEN};
     use crate::types::payment_token_note:: {PaymentTokenNote, PaymentTokenNoteMethods, PAYMENT_TOKEN_NOTE_LEN};
-    use crate::types::token::{TokenPrivateContextInterface, FromTransferStruct, ToTransferStruct};
+    use crate::types::token::{TokenPrivateContextInterface, FromTransferPublicStruct, ToTransferPublicStruct, FromUnshieldStruct, ToUnshieldStruct};
 
     use dep::std::option::Option;
 
@@ -123,10 +123,10 @@ contract PrivateOracle {
         let sender = AztecAddress::new(context.msg_sender());
 
         // Take the payment from the user
-        TokenPrivateContextInterface::at(payment_token.address).transfer(
+        TokenPrivateContextInterface::at(payment_token.address).unshield(
             &mut context, 
-            FromTransferStruct { address: sender.address }, 
-            ToTransferStruct { address: address_this.address }, 
+            FromUnshieldStruct { address: sender.address }, 
+            ToUnshieldStruct { address: address_this.address }, 
             fee, 
             nonce
         );
@@ -266,10 +266,10 @@ contract PrivateOracle {
         storage.questions.remove(request.unwrap_unchecked());
 
         // Pay the divinity
-        TokenPrivateContextInterface::at(payment_token.address).transfer(
+        TokenPrivateContextInterface::at(payment_token.address).transfer_public(
             &mut context, 
-            FromTransferStruct { address: address_this.address }, 
-            ToTransferStruct { address: divinity_calling.address }, 
+            FromTransferPublicStruct { address: address_this.address }, 
+            ToTransferPublicStruct { address: divinity_calling.address }, 
             fee, 
             0
         );
@@ -308,10 +308,10 @@ contract PrivateOracle {
         storage.questions.remove(question_note);
 
         // Return funds to user
-        TokenPrivateContextInterface::at(payment_token.address).transfer(
+        TokenPrivateContextInterface::at(payment_token.address).transfer_public(
             &mut context, 
-            FromTransferStruct { address: address_this.address }, 
-            ToTransferStruct { address: caller.address }, 
+            FromTransferPublicStruct { address: address_this.address }, 
+            ToTransferPublicStruct { address: caller.address }, 
             fee, 
             0
         );

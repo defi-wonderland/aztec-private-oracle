@@ -89,9 +89,9 @@ describe("E2E Private Oracle", () => {
       await token.withWallet(requester).methods.redeem_shield(requester.getAddress(), MINT_AMOUNT, secret).send().wait();
 
       // Deploy the oracle
-      const receipt = PrivateOracleContract.deploy(pxe, token.address, FEE).send();
-      oracle = await receipt.deployed();
-      await addTokenAndFeeNotesToPXE(requester.getAddress(), oracle.address, token.address, FEE, await receipt.getTxHash());
+      const receipt = await PrivateOracleContract.deploy(pxe, token.address, FEE).send().wait();
+      oracle = receipt.contract;
+      await addTokenAndFeeNotesToPXE(requester.getAddress(), oracle.address, token.address, FEE, await receipt.txHash);
 
       logger(`Oracle deployed at ${oracle.address}`);
     }, 30_000);

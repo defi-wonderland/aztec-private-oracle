@@ -345,10 +345,13 @@ contract PrivateOracle {
     unconstrained fn compute_note_hash_and_nullifier(contract_address: Field, nonce: Field, storage_slot: Field, preimage: [Field; ANSWER_NOTE_LEN]) -> [Field; 4] {
         let note_header = NoteHeader::new(contract_address, nonce, storage_slot);
 
-        if(storage_slot == QUESTION_SET_SLOT) {
+        if(storage_slot == PAYMENT_TOKEN_SLOT) {
+            note_utils::compute_note_hash_and_nullifier(PaymentTokenNoteMethods, note_header, preimage)
+        } else if(storage_slot == FEE_SLOT) {
+            note_utils::compute_note_hash_and_nullifier(FeeNoteMethods, note_header, preimage)
+        } else if(storage_slot == QUESTION_SET_SLOT) {
             note_utils::compute_note_hash_and_nullifier(QuestionNoteMethods, note_header, preimage)
-        }
-        else {
+        } else {
             note_utils::compute_note_hash_and_nullifier(AnswerNoteMethods, note_header, preimage)
         }
     }

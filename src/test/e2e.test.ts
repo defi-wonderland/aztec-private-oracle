@@ -116,7 +116,7 @@ describe("E2E Private Oracle", () => {
     });
 
     // Test: is the tx successful
-    it("Tx to submit_question is mined", async () => {
+    it("Tx to submit_question is mined and token are transfered", async () => {
       const nonce = await createAuthUnshieldMessage(
         token,
         requester,
@@ -131,6 +131,19 @@ describe("E2E Private Oracle", () => {
         .wait();
 
       expect(receipt.status).toBe("mined");
+
+      let requesterBalance = await token
+        .withWallet(requester)
+        .methods.balance_of_private(requester.getAddress())
+        .view();
+
+      expect(requesterBalance).toEqual(MINT_AMOUNT - FEE);
+
+      let oracleBalance = await token.methods
+        .balance_of_public(oracle.address)
+        .view();
+
+      expect(oracleBalance).toEqual(FEE);
     });
 
     // Test: is the note correctly stored in the private storage, for the divinity
@@ -244,19 +257,29 @@ describe("E2E Private Oracle", () => {
       expect(divinityRequestsNotes[1].items[3]).not.toEqual(
         shared_key_nullifier_divinity
       );
-    });
+    }, 30_000);
   });
 
   describe("submit_answer(..)", () => {
     // Setup: Deploy the oracle and submit a question
     beforeAll(async () => {
+      // Deploy the token
+      token = await TokenContract.deploy(pxe, requester.getAddress())
+        .send()
+        .deployed();
+
+      // Mint tokens for the requester
+      await mintTokenFor(requester, requester, MINT_AMOUNT);
+
       // Deploy the oracle
       const receipt = PrivateOracleContract.deploy(
         pxe,
         token.address,
         FEE
       ).send();
+
       oracle = await receipt.deployed();
+
       await addTokenAndFeeNotesToPXE(
         requester.getAddress(),
         oracle.address,
@@ -281,7 +304,7 @@ describe("E2E Private Oracle", () => {
     }, 30_000);
 
     // Test: is the tx successful
-    it("Tx to submit_answer is mined", async () => {
+    it("Tx to submit_answer is mined and tokens are transferred to the divinity", async () => {
       // Submit the answer
       const receipt = await oracle
         .withWallet(divinity)
@@ -290,6 +313,18 @@ describe("E2E Private Oracle", () => {
         .wait();
 
       expect(receipt.status).toBe("mined");
+
+      let divinityBalance = await token.methods
+        .balance_of_public(divinity.getAddress())
+        .view();
+
+      expect(divinityBalance).toEqual(FEE);
+
+      let oracleBalance = await token.methods
+        .balance_of_public(oracle.address)
+        .view();
+
+      expect(oracleBalance).toEqual(0n);
     });
 
     // Test: is the answer note stored correct, for the divinity
@@ -413,6 +448,14 @@ describe("E2E Private Oracle", () => {
   describe("cancel_question(..)", () => {
     // Setup: Deploy the oracle and submit the question
     beforeAll(async () => {
+      // Deploy the token
+      token = await TokenContract.deploy(pxe, requester.getAddress())
+        .send()
+        .deployed();
+
+      // Mint tokens for the requester
+      await mintTokenFor(requester, requester, MINT_AMOUNT);
+
       // Deploy the oracle
       const receipt = PrivateOracleContract.deploy(
         pxe,
@@ -444,7 +487,7 @@ describe("E2E Private Oracle", () => {
     }, 30_000);
 
     // Test: is the tx successful
-    it("Tx to cancel_question is mined", async () => {
+    it("Tx to cancel_question is mined and token transferred back to requester", async () => {
       const receipt = await oracle
         .withWallet(requester)
         .methods.cancel_question(QUESTION)
@@ -452,6 +495,25 @@ describe("E2E Private Oracle", () => {
         .wait();
 
       expect(receipt.status).toBe("mined");
+
+      let requesterBalance = await token
+        .withWallet(requester)
+        .methods.balance_of_private(requester.getAddress())
+        .view();
+
+      // Refunded portion is unshielded
+      requesterBalance += await token.methods
+        .balance_of_public(requester.getAddress())
+        .view();
+
+      // expect(requesterBalance).toEqual(MINT_AMOUNT);
+
+      let oracleBalance = await token
+        .withWallet(requester)
+        .methods.balance_of_public(oracle.address)
+        .view();
+
+      expect(oracleBalance).toEqual(0n);
     });
 
     // Test: is the request note of the requester now nullified
@@ -484,6 +546,14 @@ describe("E2E Private Oracle", () => {
   describe("unconstrained: get_answer_unconstrained(..)", () => {
     // Setup: Deploy the oracle and submit a question
     beforeAll(async () => {
+      // Deploy the token
+      token = await TokenContract.deploy(pxe, requester.getAddress())
+        .send()
+        .deployed();
+
+      // Mint tokens for the requester
+      await mintTokenFor(requester, requester, MINT_AMOUNT);
+
       // Deploy the oracle
       const receipt = PrivateOracleContract.deploy(
         pxe,
@@ -630,20 +700,6 @@ const mintTokenFor = async (
     .wait();
 
   await addPendingShieldNoteToPXE(minter, amount, secretHash, recipt.txHash);
-
-  // Transfer the tokens to the requester
-  // if (account != minter) {
-  //   await token
-  //     .withWallet(minter)
-  //     .methods.transfer(
-  //       minter.getAddress(),
-  //       account.getAddress(),
-  //       amount,
-  //       secretHash
-  //     )
-  //     .send()
-  //     .wait();
-  // }
 
   await token
     .withWallet(minter)

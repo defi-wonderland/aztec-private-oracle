@@ -506,7 +506,7 @@ describe("E2E Private Oracle", () => {
         .balance_of_public(requester.getAddress())
         .view();
 
-      // expect(requesterBalance).toEqual(MINT_AMOUNT);
+      expect(requesterBalance).toEqual(MINT_AMOUNT);
 
       let oracleBalance = await token
         .withWallet(requester)

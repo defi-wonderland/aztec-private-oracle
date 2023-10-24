@@ -1,13 +1,20 @@
-use dep::aztec::note::{
-    note_header::NoteHeader,
-    note_interface::NoteInterface,
-    utils::compute_note_hash_for_read_or_nullify,
+use dep::aztec::{
+    note::{
+        note_header::NoteHeader,
+        note_interface::NoteInterface,
+        utils::compute_note_hash_for_read_or_nullify,
+    },
+    oracle::{
+        get_secret_key::get_secret_key,
+        get_public_key::get_public_key,
+    },
+    log::emit_encrypted_log,
+    context::PrivateContext,
+    types::{
+        point::Point,
+        address::AztecAddress
+    }
 };
-use dep::aztec::oracle::{
-    get_secret_key::get_secret_key,
-    get_public_key::get_public_key,
-};
-use dep::aztec::types::address::AztecAddress;
 
 struct AnswerNote {
     request: Field,
@@ -21,7 +28,7 @@ struct AnswerNote {
 global ANSWER_NOTE_LEN: Field = 5;
 
 impl AnswerNote {
-    fn new(_request: Field, _answer: Field, _requester: AztecAddress, _divinity: AztecAddress, _owner: AztecAddress) -> Self {
+    pub fn new(_request: Field, _answer: Field, _requester: AztecAddress, _divinity: AztecAddress, _owner: AztecAddress) -> Self {
         AnswerNote {
             request: _request,
             answer: _answer,
@@ -67,6 +74,17 @@ impl AnswerNote {
     fn set_header(&mut self, header: NoteHeader) {
         self.header = header;
     }
+
+    fn broadcast(self, context: &mut PrivateContext, slot: Field) {
+        let encryption_pub_key = get_public_key(self.owner.address);
+        emit_encrypted_log(
+            context,
+            (*context).this_address(),
+            slot,
+            encryption_pub_key,
+            self.serialize(),
+        );
+    }
 }
 
 fn deserialize(preimage: [Field; ANSWER_NOTE_LEN]) -> AnswerNote {
@@ -93,6 +111,10 @@ fn set_header(note: &mut AnswerNote, header: NoteHeader) {
     note.set_header(header)
 }
 
+fn broadcast(context: &mut PrivateContext, slot: Field, note: AnswerNote) {
+    note.broadcast(context, slot);
+}
+
 global AnswerNoteMethods = NoteInterface {
     deserialize,
     serialize,
@@ -100,4 +122,5 @@ global AnswerNoteMethods = NoteInterface {
     compute_nullifier,
     get_header,
     set_header,
+    broadcast,
 };

@@ -22,8 +22,7 @@ import {
 import { toBigIntBE } from "@aztec/foundation/bigint-buffer";
 import { format } from "util";
 
-// import { TokenContract } from "@aztec/noir-contracts/types";
-import { TokenContract } from "../../token/Token.js";
+import { TokenContract } from "@aztec/noir-contracts/types";
 import { PrivateOracleContract } from "../../types/PrivateOracle.js";
 
 const {

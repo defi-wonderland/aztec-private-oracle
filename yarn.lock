@@ -1851,10 +1851,6 @@ async@^3.2.3:
   resolved "https://registry.yarnpkg.com/async/-/async-3.2.4.tgz#2d22e00f8cddeb5fde5dd33522b56d1cf569a81c"
   integrity sha512-iAB+JbDEGXhyIUavoDl9WP/Jj106Kz9DEn1DPgYw5ruDn0e3Wgi3sKFm55sASdGBNOQB8F59d9qQ7deqrHA8wQ==
 
-"aztec-packages@https://github.com/AztecProtocol/aztec-packages#aztec-packages-v0.9.0":
-  version "0.0.0"
-  resolved "https://github.com/AztecProtocol/aztec-packages#93000c4dae3caa0be055a29939ac9052b977fbac"
-
 babel-jest@^29.7.0:
   version "29.7.0"
   resolved "https://registry.yarnpkg.com/babel-jest/-/babel-jest-29.7.0.tgz#f4369919225b684c56085998ac63dbd05be020d5"

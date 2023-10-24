@@ -39,6 +39,9 @@ mod types;
 contract PrivateOracle {
     use crate::types::question_note:: {QuestionNote, QuestionNoteMethods, QUESTION_NOTE_LEN};
     use crate::types::answer_note:: {AnswerNote, AnswerNoteMethods, ANSWER_NOTE_LEN};
+    use crate::types::fee_note:: {FeeNote, FeeNoteMethods, FEE_NOTE_LEN};
+    use crate::types::payment_token_note:: {PaymentTokenNote, PaymentTokenNoteMethods, PAYMENT_TOKEN_NOTE_LEN};
+    use crate::types::token::{TokenPrivateContextInterface, FromTransferPublicStruct, ToTransferPublicStruct, FromUnshieldStruct, ToUnshieldStruct};
 
     use dep::std::option::Option;
 
@@ -62,28 +65,37 @@ contract PrivateOracle {
         singleton::Singleton,
         immutable_singleton::ImmutableSingleton
     };
+    use dep::aztec::selector::compute_selector;
     use dep::aztec::types::type_serialization::field_serialization::{ FieldSerializationMethods, FIELD_SERIALIZED_LEN};
-
-    use dep::aztec::types::address::AztecAddress;
     
-    global QUESTION_SET_SLOT = 1;
-    global ANSWER_SET_SLOT = 2;
+    use dep::aztec::types::address::AztecAddress;
+    use dep::aztec::types::type_serialization::aztec_address_serialization::{AztecAddressSerializationMethods, AZTEC_ADDRESS_SERIALIZED_LEN};
+
+    global PAYMENT_TOKEN_SLOT = 1;
+    global FEE_SLOT = 2;
+    global QUESTION_SET_SLOT = 3;
+    global ANSWER_SET_SLOT = 4;
 
     struct Storage {
+        payment_token: ImmutableSingleton<PaymentTokenNote, PAYMENT_TOKEN_NOTE_LEN>,
+        fee: ImmutableSingleton<FeeNote, FEE_NOTE_LEN>,
         questions: Set<QuestionNote, QUESTION_NOTE_LEN>,
         answers: Set<AnswerNote, ANSWER_NOTE_LEN> // TODO: use a set of immutable singletons
-        // payment_token: PublicState<Field, FIELD_SERIALIZED_LEN>,
-        // fee: PublicState<Field, FIELD_SERIALIZED_LEN>,
-        // stored_balance: PublicState<Field, FIELD_SERIALIZED_LEN>,
-        // balance_of: Map<Set<ValueNote, VALUE_NOTE_LEN>>,
     }
 
     impl Storage {
         fn init(context: Context) -> pub Self {
             Storage {
                 // -- Public --
-
                 // -- Private --
+                // Token to use for payment
+                payment_token: ImmutableSingleton::new(
+                    context,
+                    PAYMENT_TOKEN_SLOT,
+                    PaymentTokenNoteMethods,
+                ),
+                // Fee to pay for a question
+                fee: ImmutableSingleton::new(context, FEE_SLOT, FeeNoteMethods),
                 // Set of questions
                 questions: Set::new(context, QUESTION_SET_SLOT, QuestionNoteMethods),
                 // Set of answers
@@ -93,16 +105,31 @@ contract PrivateOracle {
     }
  
     // Constructs the contract.
-    #[aztec(private)] 
-    fn constructor() {
+    #[aztec(private)]
+    fn constructor(payment_token: AztecAddress, fee: Field) {
+       let mut payment_token_note = PaymentTokenNote::new(payment_token);
+        storage.payment_token.initialize(&mut payment_token_note, Option::none());
+
+       let mut fee_note = FeeNote::new(fee);
+        storage.fee.initialize(&mut fee_note, Option::none());
     }
 
     // Requester submit a question
     #[aztec(private)]
-    fn submit_question(question: Field, divinity_address: AztecAddress) {
-        let storage = Storage::init(Context::private(&mut context));
+    fn submit_question(question: Field, divinity_address: AztecAddress, nonce: Field) {
+        let payment_token = storage.payment_token.get_note().payment_token;
+        let fee = storage.fee.get_note().fee;
         let address_this = AztecAddress::new(context.this_address());
         let sender = AztecAddress::new(context.msg_sender());
+
+        // Take the payment from the user
+        TokenPrivateContextInterface::at(payment_token.address).unshield(
+            &mut context, 
+            FromUnshieldStruct { address: sender.address }, 
+            ToUnshieldStruct { address: address_this.address }, 
+            fee, 
+            nonce
+        );
 
         // Assert if question doesn't already exist from the same requester
         let question_getter_option = NoteGetterOptions::new().select(0, question).select(1, sender.address).set_limit(1);
@@ -145,7 +172,8 @@ contract PrivateOracle {
     // Divinity submit an answer to a given question
     #[aztec(private)]
     fn submit_answer(question: Field, requester: AztecAddress, answer: Field) { 
-        let storage = Storage::init(Context::private(&mut context));
+        let payment_token = storage.payment_token.get_note().payment_token;
+        let fee = storage.fee.get_note().fee;
         let divinity_calling = AztecAddress::new(context.msg_sender());
         let address_this = AztecAddress::new(context.this_address());
 
@@ -236,6 +264,15 @@ contract PrivateOracle {
 
         // Nullify the question note (will nullify both divinity and requester notes, via the shared key)
         storage.questions.remove(request.unwrap_unchecked());
+
+        // Pay the divinity
+        TokenPrivateContextInterface::at(payment_token.address).transfer_public(
+            &mut context, 
+            FromTransferPublicStruct { address: address_this.address }, 
+            ToTransferPublicStruct { address: divinity_calling.address }, 
+            fee, 
+            0
+        );
     }
 
     // Requester consults the answer to one of their questions
@@ -258,8 +295,10 @@ contract PrivateOracle {
     // Requester cancels a question - no real utility here, will be usefull when request bound an amount, waiting for the answer
     #[aztec(private)]
     fn cancel_question(question: Field) {
-        let storage = Storage::init(Context::private(&mut context));
+        let payment_token = storage.payment_token.get_note().payment_token;
+        let fee = storage.fee.get_note().fee;
         let caller = AztecAddress::new(context.msg_sender());
+        let address_this = AztecAddress::new(context.this_address());
 
         // create the Answer_getter_option: SELECT by address and max number of requests
         let question_getter_option = NoteGetterOptions::new().select(0, question).select(1, caller.address).set_limit(1);
@@ -267,6 +306,15 @@ contract PrivateOracle {
 
         // nullify the note
         storage.questions.remove(question_note);
+
+        // Return funds to user
+        TokenPrivateContextInterface::at(payment_token.address).transfer_public(
+            &mut context, 
+            FromTransferPublicStruct { address: address_this.address }, 
+            ToTransferPublicStruct { address: caller.address }, 
+            fee, 
+            0
+        );
     }
 
     // Get the answer to a question - unconstrained. Returns all answers to the same questions, from all the divinities
@@ -283,14 +331,27 @@ contract PrivateOracle {
         storage.answers.view_notes(answer_getter_option)[0].unwrap_unchecked()
     }
 
+    // // Returns the fee
+    // unconstrained fn storage.fee.get_note() -> Field {
+    //     storage.fee.get_note()
+    // }
+
+    // // Returns the payment token
+    // unconstrained fn storage.payment_token. -> Field {
+    //     storage.payment_token.get_note().address
+    // }
+
     // Computes note hash and nullifier.
     unconstrained fn compute_note_hash_and_nullifier(contract_address: Field, nonce: Field, storage_slot: Field, preimage: [Field; ANSWER_NOTE_LEN]) -> [Field; 4] {
         let note_header = NoteHeader::new(contract_address, nonce, storage_slot);
 
-        if(storage_slot == QUESTION_SET_SLOT) {
+        if(storage_slot == PAYMENT_TOKEN_SLOT) {
+            note_utils::compute_note_hash_and_nullifier(PaymentTokenNoteMethods, note_header, preimage)
+        } else if(storage_slot == FEE_SLOT) {
+            note_utils::compute_note_hash_and_nullifier(FeeNoteMethods, note_header, preimage)
+        } else if(storage_slot == QUESTION_SET_SLOT) {
             note_utils::compute_note_hash_and_nullifier(QuestionNoteMethods, note_header, preimage)
-        }
-        else {
+        } else {
             note_utils::compute_note_hash_and_nullifier(AnswerNoteMethods, note_header, preimage)
         }
     }

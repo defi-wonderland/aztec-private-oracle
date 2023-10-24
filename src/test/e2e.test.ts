@@ -16,10 +16,14 @@ import {
   AztecAddress,
   AccountWalletWithPrivateKey,
   EthAddress,
+  computeAuthWitMessageHash,
+  TxHash,
 } from "@aztec/aztec.js";
 import { toBigIntBE } from "@aztec/foundation/bigint-buffer";
 import { format } from "util";
 
+// import { TokenContract } from "@aztec/noir-contracts/types";
+import { TokenContract } from "../../token/Token.js";
 import { PrivateOracleContract } from "../../types/PrivateOracle.js";
 
 const {
@@ -27,21 +31,31 @@ const {
   ETHEREUM_HOST = "http://localhost:8545",
 } = process.env;
 
-const QUESTIONS_SLOT: Fr = new Fr(1);
-const ANSWERS_SLOT: Fr = new Fr(2);
+const QUESTIONS_SLOT: Fr = new Fr(3);
+const ANSWERS_SLOT: Fr = new Fr(4);
 
 const QUESTION = 123n;
 const ANSWER = 456n;
 const ALTERNATIVE_ANSWER = 789n;
+const FEE = 1000n;
+const MINT_AMOUNT = 10000n;
 
 let pxe: PXE;
 let oracle: PrivateOracleContract;
+let token: TokenContract;
+
 let requester: AccountWalletWithPrivateKey;
 let requester2: AccountWalletWithPrivateKey;
 let divinity: AccountWalletWithPrivateKey;
 let deployer: AccountWalletWithPrivateKey;
 
 const logger = createDebugLogger("oracle");
+
+const addPendingShieldNoteToPXE = async (account: AccountWalletWithPrivateKey, amount: bigint, secretHash: Fr, txHash: TxHash) => {
+  const storageSlot = new Fr(5); // The storage slot of `pending_shields` is 5.
+  const preimage = new NotePreimage([new Fr(amount), secretHash]);
+  await account.addNote(account.getAddress(), token.address, storageSlot, preimage, txHash);
+};
 
 // Setup: Set the sandbox
 beforeAll(async () => {
@@ -64,21 +78,72 @@ describe("E2E Private Oracle", () => {
 
     // Setup: Deploy the oracle
     beforeAll(async () => {
-      oracle = await PrivateOracleContract.deploy(pxe).send().deployed();
+      // Deploy the token
+      token = await TokenContract.deploy(pxe, requester.getAddress())
+        .send()
+        .deployed();
+
+      // Mint tokens for the requester
+      await mintTokenFor(requester, requester, MINT_AMOUNT);
+
+      // Deploy the oracle
+      const receipt = await PrivateOracleContract.deploy(
+        pxe,
+        token.address,
+        FEE
+      )
+        .send()
+        .wait();
+      oracle = receipt.contract;
+
+      await addTokenAndFeeNotesToPXE(
+        requester.getAddress(),
+        oracle.address,
+        token.address,
+        FEE,
+        await receipt.txHash
+      );
 
       logger(`Oracle deployed at ${oracle.address}`);
     }, 30_000);
 
+    it("Requester has tokens", async () => {
+      let requesterBalance = await token
+        .withWallet(requester)
+        .methods.balance_of_private(requester.getAddress())
+        .view();
+      expect(requesterBalance).toEqual(MINT_AMOUNT);
+    });
+
     // Test: is the tx successful
-    it("Tx to submit_question is mined", async () => {
+    it("Tx to submit_question is mined and token are transfered", async () => {
+      const nonce = await createAuthUnshieldMessage(
+        token,
+        requester,
+        oracle.address,
+        FEE
+      );
       // Submit the question
       const receipt = await oracle
         .withWallet(requester)
-        .methods.submit_question(QUESTION, divinity.getAddress())
+        .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
         .send()
         .wait();
 
       expect(receipt.status).toBe("mined");
+
+      let requesterBalance = await token
+        .withWallet(requester)
+        .methods.balance_of_private(requester.getAddress())
+        .view();
+
+      expect(requesterBalance).toEqual(MINT_AMOUNT - FEE);
+
+      let oracleBalance = await token.methods
+        .balance_of_public(oracle.address)
+        .view();
+
+      expect(oracleBalance).toEqual(FEE);
     });
 
     // Test: is the note correctly stored in the private storage, for the divinity
@@ -135,10 +200,20 @@ describe("E2E Private Oracle", () => {
     // Test: creating a new question with the same parameters (from a different requester) is possible
     //       and will have a different nullifier shared key
     it("another requester can ask the same question and will get a different nullifier shared key", async () => {
+      const nonce = await createAuthUnshieldMessage(
+        token,
+        requester2,
+        oracle.address,
+        FEE
+      );
+
+      // Mint tokens for the requester
+      await mintTokenFor(requester2, requester, MINT_AMOUNT);
+
       // Submit the question
       await oracle
         .withWallet(requester2)
-        .methods.submit_question(QUESTION, divinity.getAddress())
+        .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
         .send()
         .wait();
 
@@ -182,25 +257,54 @@ describe("E2E Private Oracle", () => {
       expect(divinityRequestsNotes[1].items[3]).not.toEqual(
         shared_key_nullifier_divinity
       );
-    });
+    }, 30_000);
   });
 
   describe("submit_answer(..)", () => {
     // Setup: Deploy the oracle and submit a question
     beforeAll(async () => {
+      // Deploy the token
+      token = await TokenContract.deploy(pxe, requester.getAddress())
+        .send()
+        .deployed();
+
+      // Mint tokens for the requester
+      await mintTokenFor(requester, requester, MINT_AMOUNT);
+
       // Deploy the oracle
-      oracle = await PrivateOracleContract.deploy(pxe).send().deployed();
+      const receipt = PrivateOracleContract.deploy(
+        pxe,
+        token.address,
+        FEE
+      ).send();
+
+      oracle = await receipt.deployed();
+
+      await addTokenAndFeeNotesToPXE(
+        requester.getAddress(),
+        oracle.address,
+        token.address,
+        FEE,
+        await receipt.getTxHash()
+      );
+
+      const nonce = await createAuthUnshieldMessage(
+        token,
+        requester,
+        oracle.address,
+        FEE
+      );
 
       // Submit a question
       await oracle
         .withWallet(requester)
-        .methods.submit_question(QUESTION, divinity.getAddress())
+        .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
         .send()
         .wait();
     }, 30_000);
 
     // Test: is the tx successful
-    it("Tx to submit_answer is mined", async () => {
+    it("Tx to submit_answer is mined and tokens are transferred to the divinity", async () => {
       // Submit the answer
       const receipt = await oracle
         .withWallet(divinity)
@@ -209,6 +313,18 @@ describe("E2E Private Oracle", () => {
         .wait();
 
       expect(receipt.status).toBe("mined");
+
+      let divinityBalance = await token.methods
+        .balance_of_public(divinity.getAddress())
+        .view();
+
+      expect(divinityBalance).toEqual(FEE);
+
+      let oracleBalance = await token.methods
+        .balance_of_public(oracle.address)
+        .view();
+
+      expect(oracleBalance).toEqual(0n);
     });
 
     // Test: is the answer note stored correct, for the divinity
@@ -288,10 +404,20 @@ describe("E2E Private Oracle", () => {
     // Test: if a second request is made from a different requester, asking the same question, is the divinity
     //       forced to answer with the same answer (answer consistency)?
     it("second identical question cannot have a different answer (from the same divinity)", async () => {
+      const nonce = await createAuthUnshieldMessage(
+        token,
+        requester2,
+        oracle.address,
+        FEE
+      );
+
+      // Mint tokens for the requester
+      await mintTokenFor(requester2, requester, MINT_AMOUNT);
+
       // Setup: submit the same question from a second requester
       await oracle
         .withWallet(requester2)
-        .methods.submit_question(QUESTION, divinity.getAddress())
+        .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
         .send()
         .wait();
 
@@ -316,25 +442,52 @@ describe("E2E Private Oracle", () => {
       // Check: Compare the note's data with the expected values: the answer is the same as the first one and not the new one
       expect(requester2AnswersNotes[0].items[0].value).toEqual(QUESTION);
       expect(requester2AnswersNotes[0].items[1].value).toEqual(ANSWER);
-    });
+    }, 30_000);
   });
 
   describe("cancel_question(..)", () => {
     // Setup: Deploy the oracle and submit the question
     beforeAll(async () => {
+      // Deploy the token
+      token = await TokenContract.deploy(pxe, requester.getAddress())
+        .send()
+        .deployed();
+
+      // Mint tokens for the requester
+      await mintTokenFor(requester, requester, MINT_AMOUNT);
+
       // Deploy the oracle
-      oracle = await PrivateOracleContract.deploy(pxe).send().deployed();
+      const receipt = PrivateOracleContract.deploy(
+        pxe,
+        token.address,
+        FEE
+      ).send();
+      oracle = await receipt.deployed();
+      await addTokenAndFeeNotesToPXE(
+        requester.getAddress(),
+        oracle.address,
+        token.address,
+        FEE,
+        await receipt.getTxHash()
+      );
+
+      const nonce = await createAuthUnshieldMessage(
+        token,
+        requester,
+        oracle.address,
+        FEE
+      );
 
       // Submit a question
       await oracle
         .withWallet(requester)
-        .methods.submit_question(QUESTION, divinity.getAddress())
+        .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
         .send()
         .wait();
     }, 30_000);
 
     // Test: is the tx successful
-    it("Tx to cancel_question is mined", async () => {
+    it("Tx to cancel_question is mined and token transferred back to requester", async () => {
       const receipt = await oracle
         .withWallet(requester)
         .methods.cancel_question(QUESTION)
@@ -342,6 +495,25 @@ describe("E2E Private Oracle", () => {
         .wait();
 
       expect(receipt.status).toBe("mined");
+
+      let requesterBalance = await token
+        .withWallet(requester)
+        .methods.balance_of_private(requester.getAddress())
+        .view();
+
+      // Refunded portion is unshielded
+      requesterBalance += await token.methods
+        .balance_of_public(requester.getAddress())
+        .view();
+
+      expect(requesterBalance).toEqual(MINT_AMOUNT);
+
+      let oracleBalance = await token
+        .withWallet(requester)
+        .methods.balance_of_public(oracle.address)
+        .view();
+
+      expect(oracleBalance).toEqual(0n);
     });
 
     // Test: is the request note of the requester now nullified
@@ -374,13 +546,41 @@ describe("E2E Private Oracle", () => {
   describe("unconstrained: get_answer_unconstrained(..)", () => {
     // Setup: Deploy the oracle and submit a question
     beforeAll(async () => {
+      // Deploy the token
+      token = await TokenContract.deploy(pxe, requester.getAddress())
+        .send()
+        .deployed();
+
+      // Mint tokens for the requester
+      await mintTokenFor(requester, requester, MINT_AMOUNT);
+
       // Deploy the oracle
-      oracle = await PrivateOracleContract.deploy(pxe).send().deployed();
+      const receipt = PrivateOracleContract.deploy(
+        pxe,
+        token.address,
+        FEE
+      ).send();
+      oracle = await receipt.deployed();
+
+      await addTokenAndFeeNotesToPXE(
+        requester.getAddress(),
+        oracle.address,
+        token.address,
+        FEE,
+        await receipt.getTxHash()
+      );
+
+      const nonce = await createAuthUnshieldMessage(
+        token,
+        requester,
+        oracle.address,
+        FEE
+      );
 
       // Submit a question
       await oracle
         .withWallet(requester)
-        .methods.submit_question(QUESTION, divinity.getAddress())
+        .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
         .send()
         .wait();
 
@@ -437,3 +637,73 @@ describe("E2E Private Oracle", () => {
     });
   });
 });
+
+const createAuthUnshieldMessage = async (
+  token: TokenContract,
+  from: AccountWalletWithPrivateKey,
+  to: AztecAddress,
+  amount: any
+) => {
+  const nonce = Fr.random();
+
+  // We need to compute the message we want to sign and add it to the wallet as approved
+  const action = token.methods.unshield(from.getAddress(), to, amount, nonce);
+  const messageHash = await computeAuthWitMessageHash(to, action.request());
+
+  // Both wallets are connected to same node and PXE so we could just insert directly using
+  // await wallet.signAndAddAuthWitness(messageHash, );
+  // But doing it in two actions to show the flow.
+  const witness = await from.createAuthWitness(messageHash);
+  await from.addAuthWitness(witness);
+  return nonce;
+};
+
+const addTokenAndFeeNotesToPXE = async (
+  requester: AztecAddress,
+  oracle: AztecAddress,
+  token: AztecAddress,
+  fee: bigint,
+  txHash: TxHash
+) => {
+  // Add note for the payment token
+  await pxe.addNote(
+    requester,
+    oracle,
+    new Fr(1), // The storage slot for the payment_token
+    new NotePreimage([token.toField()]),
+    txHash
+  );
+
+  // Add note for the fee
+  await pxe.addNote(
+    requester,
+    oracle,
+    new Fr(2), // The storage slot for the fee
+    new NotePreimage([new Fr(fee)]),
+    txHash
+  );
+};
+
+const mintTokenFor = async (
+  account: AccountWalletWithPrivateKey,
+  minter: AccountWalletWithPrivateKey,
+  amount: bigint
+) => {
+  // Mint private tokens
+  const secret = Fr.random();
+  const secretHash = await computeMessageSecretHash(secret);
+
+  const recipt = await token
+    .withWallet(minter)
+    .methods.mint_private(amount, secretHash)
+    .send()
+    .wait();
+
+  await addPendingShieldNoteToPXE(minter, amount, secretHash, recipt.txHash);
+
+  await token
+    .withWallet(minter)
+    .methods.redeem_shield(account.getAddress(), amount, secret)
+    .send()
+    .wait();
+};

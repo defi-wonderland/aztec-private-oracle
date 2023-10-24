@@ -147,17 +147,8 @@ contract PrivateOracle {
             random_nullifier_shared_key
         );
 
-        // Commit the note in the data tree
+        // Commit the note in the data tree and send to requester
         storage.questions.insert(&mut new_question, true);
-
-        // Encrypt/send the question to the requester notes - todo: we might remove this event later, as the requester doesn't need to read the note (only contract)
-        // emit_encrypted_log(
-        //     &mut context,
-        //     address_this.address,
-        //     QUESTION_SET_SLOT,
-        //     get_public_key(sender.address),
-        //     new_question.serialize(),
-        // );
 
         // Encrypt/send the question in the divinity notes
         emit_encrypted_log(
@@ -215,17 +206,6 @@ contract PrivateOracle {
             divinity_calling
         );
 
-        // Hasn't been answered yet (in another request)?
-        // if stored_answer_note.is_none() {
-        //     // Encrypt the answer in the oracle notes
-        //     emit_encrypted_log(
-        //         &mut context,
-        //         address_this.address,
-        //         ANSWER_SET_SLOT,
-        //         get_public_key(divinity_calling.address),
-        //         new_answer_note_for_divinity.serialize(),
-        //     );
-        // }
         if !stored_answer_note.is_none() {
             // Already answered previously?
             // Modify the answer to the preexisting one
@@ -246,21 +226,9 @@ contract PrivateOracle {
             );
         }
 
-        // Commit both notes in data tree, as insert in an if() (ie to avoid duplicating the divinity one)
-        // fails (unreachable code panick)
+        // Commit and send both notes
         storage.answers.insert(&mut new_answer_note_for_divinity, true);
         storage.answers.insert(&mut new_answer_note_for_requester, true);
-
-        // Send the note to the requester (divinity already has the answer)
-        // let requester_pub_key = get_public_key(request.unwrap_unchecked().requester_address.address);
-
-        // emit_encrypted_log(
-        //     &mut context,
-        //     address_this.address,
-        //     ANSWER_SET_SLOT,
-        //     requester_pub_key,
-        //     new_answer_note_for_requester.serialize(),
-        // );
 
         // Nullify the question note (will nullify both divinity and requester notes, via the shared key)
         storage.questions.remove(request.unwrap_unchecked());

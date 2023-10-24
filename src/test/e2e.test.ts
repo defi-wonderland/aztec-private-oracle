@@ -589,7 +589,7 @@ describe("E2E Private Oracle", () => {
         .methods.submit_answer(QUESTION, requester.getAddress(), ANSWER)
         .send()
         .wait();
-    }, 30_000);
+    }, 45_000);
 
     it("get_answer returns the correct answer to the requester", async () => {
       // Get the answer

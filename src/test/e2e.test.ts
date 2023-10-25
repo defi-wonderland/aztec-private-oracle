@@ -71,7 +71,7 @@ beforeAll(async () => {
   pxe = createPXEClient(SANDBOX_URL);
   await waitForSandbox(pxe);
 
-  [requester, requester2, divinity, deployer] = await getSandboxAccountsWallets(pxe);
+  [requester, requester2, divinity] = await getSandboxAccountsWallets(pxe);
 
   deployer = await createAccount(pxe);
 }, 30_000);

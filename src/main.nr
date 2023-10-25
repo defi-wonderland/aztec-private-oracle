@@ -121,8 +121,19 @@ contract PrivateOracle {
 
         let mut fee_note = FeeNote::new(fee);
         storage.fee.initialize(&mut fee_note, Option::none(), false);
+        
+        let selector = compute_selector("initialize_payment_token(Field,Field)");
+        context.call_public_function(context.this_address(), selector, [payment_token.address, fee]);
+    }
 
-        storage.payment_token_public.write(payment_token);
+    // Update the payment token and fee getters
+    #[aztec(public)]
+    fn initialize_payment_token(payment_token: Field, fee: Field) {
+        assert(context.msg_sender() == context.this_address());
+
+        let _payment_token = AztecAddress::new(payment_token);
+
+        storage.payment_token_public.write(_payment_token);
         storage.fee_public.write(fee);
     }
 

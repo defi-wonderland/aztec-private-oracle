@@ -640,6 +640,54 @@ describe("E2E Private Oracle", () => {
       );
     });
   });
+
+  describe.only("unconstrained: get_fee() and get_payment_token()", () => {
+    // Setup: Deploy the oracle
+    beforeAll(async () => {
+      // Deploy the token
+      token = await TokenContract.deploy(deployer, requester.getAddress())
+        .send()
+        .deployed();
+
+      // Mint tokens for the requester
+      await mintTokenFor(requester, requester, MINT_AMOUNT);
+
+      // Deploy the oracle
+      const receipt = await PrivateOracleContract.deploy(
+        deployer,
+        token.address,
+        FEE
+      )
+        .send()
+        .wait();
+      oracle = receipt.contract;
+    }, 30_000);
+
+    it("returns the correct fee", async () => {
+      let storedFee = await oracle.methods.get_fee().view();
+
+      expect(storedFee).toEqual(FEE);
+    });
+
+    it("returns the correct token address", async () => {
+      let storedTokenAddress = await oracle.methods.get_payment_token().view();
+      console.log(storedTokenAddress);
+      console.log(token.address);
+      expect(storedTokenAddress).toEqual(token.address);
+    });
+
+    // Test if not initialized a second time (even from the deployer)
+    it("getters are immutable", async () => {
+      await expect(
+        oracle
+          .withWallet(deployer)
+          .methods.initialize_payment_token(token.address, FEE + 1n)
+          .simulate()
+      ).rejects.toThrowError(
+        "(JSON-RPC PROPAGATED) Failed to solve brillig function, reason: explicit trap hit in brillig 'context.msg_sender() == context.this_address()"
+      );
+    });
+  });
 });
 
 const createAuthUnshieldMessage = async (

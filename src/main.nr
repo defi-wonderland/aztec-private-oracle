@@ -66,27 +66,32 @@ contract PrivateOracle {
         immutable_singleton::ImmutableSingleton
     };
     use dep::aztec::selector::compute_selector;
+
     use dep::aztec::types::type_serialization::field_serialization::{ FieldSerializationMethods, FIELD_SERIALIZED_LEN};
+    use dep::aztec::types::type_serialization::aztec_address_serialization::{AztecAddressSerializationMethods, AZTEC_ADDRESS_SERIALIZED_LEN};
     
     use dep::aztec::types::address::AztecAddress;
-    use dep::aztec::types::type_serialization::aztec_address_serialization::{AztecAddressSerializationMethods, AZTEC_ADDRESS_SERIALIZED_LEN};
 
     global PAYMENT_TOKEN_SLOT = 1;
     global FEE_SLOT = 2;
     global QUESTION_SET_SLOT = 3;
     global ANSWER_SET_SLOT = 4;
+    global PAYMENT_TOKEN_PUBLIC_SLOT = 5;
+    global FEE_PUBLIC_SLOT = 6;
 
     struct Storage {
         payment_token: ImmutableSingleton<PaymentTokenNote, PAYMENT_TOKEN_NOTE_LEN>,
         fee: ImmutableSingleton<FeeNote, FEE_NOTE_LEN>,
         questions: Set<QuestionNote, QUESTION_NOTE_LEN>,
-        answers: Set<AnswerNote, ANSWER_NOTE_LEN> // TODO: use a set of immutable singletons
+        answers: Set<AnswerNote, ANSWER_NOTE_LEN>, // TODO: use a set of immutable singletons
+        payment_token_public: PublicState<AztecAddress, AZTEC_ADDRESS_SERIALIZED_LEN>,
+        fee_public: PublicState<Field, FIELD_SERIALIZED_LEN>
     }
 
     impl Storage {
         fn init(context: Context) -> pub Self {
             Storage {
-                // -- Public --
+                
                 // -- Private --
                 // Token to use for payment
                 payment_token: ImmutableSingleton::new(
@@ -99,7 +104,11 @@ contract PrivateOracle {
                 // Set of questions
                 questions: Set::new(context, QUESTION_SET_SLOT, QuestionNoteMethods),
                 // Set of answers
-                answers: Set::new(context, ANSWER_SET_SLOT, AnswerNoteMethods)
+                answers: Set::new(context, ANSWER_SET_SLOT, AnswerNoteMethods),
+                
+                // -- Public --
+                payment_token_public: PublicState::new(context, PAYMENT_TOKEN_PUBLIC_SLOT, AztecAddressSerializationMethods),
+                fee_public: PublicState::new(context, FEE_PUBLIC_SLOT, FieldSerializationMethods)
             }
         }
     }
@@ -112,6 +121,20 @@ contract PrivateOracle {
 
         let mut fee_note = FeeNote::new(fee);
         storage.fee.initialize(&mut fee_note, Option::none(), false);
+        
+        let selector = compute_selector("initialize_payment_token(Field,Field)");
+        context.call_public_function(context.this_address(), selector, [payment_token.address, fee]);
+    }
+
+    // Update the payment token and fee getters
+    #[aztec(public)]
+    fn initialize_payment_token(payment_token: Field, fee: Field) {
+        assert(context.msg_sender() == context.this_address());
+
+        let _payment_token = AztecAddress::new(payment_token);
+
+        storage.payment_token_public.write(_payment_token);
+        storage.fee_public.write(fee);
     }
 
     // Requester submit a question
@@ -299,15 +322,15 @@ contract PrivateOracle {
         storage.answers.view_notes(answer_getter_option)[0].unwrap_unchecked()
     }
 
-    // // Returns the fee
-    // unconstrained fn storage.fee.get_note() -> Field {
-    //     storage.fee.get_note()
-    // }
+    // Returns the fee
+    unconstrained fn get_fee() -> Field {
+        storage.fee_public.read()
+    }
 
-    // // Returns the payment token
-    // unconstrained fn storage.payment_token. -> Field {
-    //     storage.payment_token.get_note().address
-    // }
+    // Returns the payment token
+    unconstrained fn get_payment_token() -> AztecAddress {
+        storage.payment_token_public.read()
+    }
 
     // Computes note hash and nullifier.
     unconstrained fn compute_note_hash_and_nullifier(contract_address: Field, nonce: Field, storage_slot: Field, preimage: [Field; ANSWER_NOTE_LEN]) -> [Field; 4] {

@@ -1,13 +1,16 @@
-use dep::aztec::note::{
-    note_header::NoteHeader,
-    note_interface::NoteInterface,
-    utils::compute_note_hash_for_read_or_nullify,
+use dep::aztec::{
+    note::{
+        note_header::NoteHeader,
+        note_interface::NoteInterface,
+        utils::compute_note_hash_for_read_or_nullify,
+    },
+    oracle::{
+        get_secret_key::get_secret_key,
+        get_public_key::get_public_key,
+    },
+    context::PrivateContext,
+    types::address::AztecAddress
 };
-use dep::aztec::oracle::{
-    get_secret_key::get_secret_key,
-    get_public_key::get_public_key,
-};
-use dep::aztec::types::address::AztecAddress;
 
 struct FeeNote {
     fee: Field,
@@ -17,7 +20,7 @@ struct FeeNote {
 global FEE_NOTE_LEN: Field = 1;
 
 impl FeeNote {
-    fn new(_fee: Field) -> Self {
+    pub fn new(_fee: Field) -> Self {
         FeeNote {
             fee: _fee,
             header: NoteHeader::empty(),
@@ -48,6 +51,10 @@ impl FeeNote {
     fn set_header(&mut self, header: NoteHeader) {
         self.header = header;
     }
+
+    fn broadcast(self, context: &mut PrivateContext, slot: Field) {
+        // no owner == no broadcast
+    }
 }
 
 fn deserialize(preimage: [Field; FEE_NOTE_LEN]) -> FeeNote {
@@ -74,6 +81,10 @@ fn set_header(note: &mut FeeNote, header: NoteHeader) {
     note.set_header(header)
 }
 
+fn broadcast(context: &mut PrivateContext, slot: Field, note: FeeNote) {
+    note.broadcast(context, slot);
+}
+
 global FeeNoteMethods = NoteInterface {
     deserialize,
     serialize,
@@ -81,4 +92,5 @@ global FeeNoteMethods = NoteInterface {
     compute_nullifier,
     get_header,
     set_header,
+    broadcast
 };

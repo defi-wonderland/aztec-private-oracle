@@ -1,13 +1,20 @@
-use dep::aztec::note::{
-    note_header::NoteHeader,
-    note_interface::NoteInterface,
-    utils::compute_note_hash_for_read_or_nullify,
+use dep::aztec::{
+    note::{
+        note_header::NoteHeader,
+        note_interface::NoteInterface,
+        utils::compute_note_hash_for_read_or_nullify,
+    },
+    oracle::{
+        get_secret_key::get_secret_key,
+        get_public_key::get_public_key,
+    },
+    log::emit_encrypted_log,
+    context::PrivateContext,
+    types::{
+        point::Point,
+        address::AztecAddress
+    }
 };
-use dep::aztec::oracle::{
-    get_secret_key::get_secret_key,
-    get_public_key::get_public_key,
-};
-use dep::aztec::types::address::AztecAddress;
 
 struct PaymentTokenNote {
     payment_token: AztecAddress,
@@ -17,7 +24,7 @@ struct PaymentTokenNote {
 global PAYMENT_TOKEN_NOTE_LEN: Field = 1;
 
 impl PaymentTokenNote {
-    fn new(_payment_token: AztecAddress) -> Self {
+    pub fn new(_payment_token: AztecAddress) -> Self {
         PaymentTokenNote {
             payment_token: _payment_token,
             header: NoteHeader::empty(),
@@ -48,6 +55,9 @@ impl PaymentTokenNote {
     fn set_header(&mut self, header: NoteHeader) {
         self.header = header;
     }
+
+    fn broadcast(self, context: &mut PrivateContext, slot: Field) {
+    }
 }
 
 fn deserialize(preimage: [Field; PAYMENT_TOKEN_NOTE_LEN]) -> PaymentTokenNote {
@@ -74,6 +84,10 @@ fn set_header(note: &mut PaymentTokenNote, header: NoteHeader) {
     note.set_header(header)
 }
 
+fn broadcast(context: &mut PrivateContext, slot: Field, note: PaymentTokenNote) {
+    note.broadcast(context, slot);
+}
+
 global PaymentTokenNoteMethods = NoteInterface {
     deserialize,
     serialize,
@@ -81,4 +95,5 @@ global PaymentTokenNoteMethods = NoteInterface {
     compute_nullifier,
     get_header,
     set_header,
+    broadcast
 };

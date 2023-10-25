@@ -22,8 +22,7 @@ import {
 import { toBigIntBE } from "@aztec/foundation/bigint-buffer";
 import { format } from "util";
 
-// import { TokenContract } from "@aztec/noir-contracts/types";
-import { TokenContract } from "../../token/Token.js";
+import { TokenContract } from "@aztec/noir-contracts/types";
 import { PrivateOracleContract } from "../../types/PrivateOracle.js";
 
 const {
@@ -49,12 +48,21 @@ let requester2: AccountWalletWithPrivateKey;
 let divinity: AccountWalletWithPrivateKey;
 let deployer: AccountWalletWithPrivateKey;
 
-const logger = createDebugLogger("oracle");
-
-const addPendingShieldNoteToPXE = async (account: AccountWalletWithPrivateKey, amount: bigint, secretHash: Fr, txHash: TxHash) => {
+const addPendingShieldNoteToPXE = async (
+  account: AccountWalletWithPrivateKey,
+  amount: bigint,
+  secretHash: Fr,
+  txHash: TxHash
+) => {
   const storageSlot = new Fr(5); // The storage slot of `pending_shields` is 5.
   const preimage = new NotePreimage([new Fr(amount), secretHash]);
-  await account.addNote(account.getAddress(), token.address, storageSlot, preimage, txHash);
+  await account.addNote(
+    account.getAddress(),
+    token.address,
+    storageSlot,
+    preimage,
+    txHash
+  );
 };
 
 // Setup: Set the sandbox
@@ -63,11 +71,9 @@ beforeAll(async () => {
   pxe = createPXEClient(SANDBOX_URL);
   await waitForSandbox(pxe);
 
-  const nodeInfo = await pxe.getNodeInfo();
-
-  logger(format("Aztec Sandbox Info ", nodeInfo));
-
   [requester, requester2, divinity] = await getSandboxAccountsWallets(pxe);
+
+  deployer = await createAccount(pxe);
 }, 30_000);
 
 describe("E2E Private Oracle", () => {
@@ -79,7 +85,7 @@ describe("E2E Private Oracle", () => {
     // Setup: Deploy the oracle
     beforeAll(async () => {
       // Deploy the token
-      token = await TokenContract.deploy(pxe, requester.getAddress())
+      token = await TokenContract.deploy(deployer, requester.getAddress())
         .send()
         .deployed();
 
@@ -88,7 +94,7 @@ describe("E2E Private Oracle", () => {
 
       // Deploy the oracle
       const receipt = await PrivateOracleContract.deploy(
-        pxe,
+        deployer,
         token.address,
         FEE
       )
@@ -101,10 +107,8 @@ describe("E2E Private Oracle", () => {
         oracle.address,
         token.address,
         FEE,
-        await receipt.txHash
+        receipt.txHash
       );
-
-      logger(`Oracle deployed at ${oracle.address}`);
     }, 30_000);
 
     it("Requester has tokens", async () => {
@@ -264,7 +268,7 @@ describe("E2E Private Oracle", () => {
     // Setup: Deploy the oracle and submit a question
     beforeAll(async () => {
       // Deploy the token
-      token = await TokenContract.deploy(pxe, requester.getAddress())
+      token = await TokenContract.deploy(deployer, requester.getAddress())
         .send()
         .deployed();
 
@@ -273,7 +277,7 @@ describe("E2E Private Oracle", () => {
 
       // Deploy the oracle
       const receipt = PrivateOracleContract.deploy(
-        pxe,
+        deployer,
         token.address,
         FEE
       ).send();
@@ -449,7 +453,7 @@ describe("E2E Private Oracle", () => {
     // Setup: Deploy the oracle and submit the question
     beforeAll(async () => {
       // Deploy the token
-      token = await TokenContract.deploy(pxe, requester.getAddress())
+      token = await TokenContract.deploy(deployer, requester.getAddress())
         .send()
         .deployed();
 
@@ -458,7 +462,7 @@ describe("E2E Private Oracle", () => {
 
       // Deploy the oracle
       const receipt = PrivateOracleContract.deploy(
-        pxe,
+        deployer,
         token.address,
         FEE
       ).send();
@@ -547,7 +551,7 @@ describe("E2E Private Oracle", () => {
     // Setup: Deploy the oracle and submit a question
     beforeAll(async () => {
       // Deploy the token
-      token = await TokenContract.deploy(pxe, requester.getAddress())
+      token = await TokenContract.deploy(deployer, requester.getAddress())
         .send()
         .deployed();
 
@@ -556,7 +560,7 @@ describe("E2E Private Oracle", () => {
 
       // Deploy the oracle
       const receipt = PrivateOracleContract.deploy(
-        pxe,
+        deployer,
         token.address,
         FEE
       ).send();
@@ -590,7 +594,7 @@ describe("E2E Private Oracle", () => {
         .methods.submit_answer(QUESTION, requester.getAddress(), ANSWER)
         .send()
         .wait();
-    }, 30_000);
+    }, 45_000);
 
     it("get_answer returns the correct answer to the requester", async () => {
       // Get the answer

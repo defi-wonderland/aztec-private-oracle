@@ -1,15 +1,20 @@
-use dep::aztec::note::{
-    note_header::NoteHeader,
-    note_interface::NoteInterface,
-    utils::compute_note_hash_for_read_or_nullify,
+use dep::aztec::{
+    note::{
+        note_header::NoteHeader,
+        note_interface::NoteInterface,
+        utils::compute_note_hash_for_read_or_nullify,
+    },
+    oracle::{
+        get_secret_key::get_secret_key,
+        get_public_key::get_public_key,
+    },
+    log::emit_encrypted_log,
+    context::PrivateContext,
+    types::{
+        point::Point,
+        address::AztecAddress
+    }
 };
-use dep::aztec::oracle::{
-    get_secret_key::get_secret_key,
-    get_public_key::get_public_key,
-};
-
-use dep::aztec::types::point::Point;
-use dep::aztec::types::address::AztecAddress;
 
 /// @member request: the question asked
 /// @member requester_address: the address of the requester
@@ -28,7 +33,7 @@ struct QuestionNote {
 global QUESTION_NOTE_LEN: Field = 4;
 
 impl QuestionNote {
-    fn new( _request: Field,
+    pub fn new( _request: Field,
             _requesterAddress: AztecAddress,
             _divinityAddress: AztecAddress,
             _sharedNullifierKey: Field
@@ -75,6 +80,19 @@ impl QuestionNote {
     fn set_header(&mut self, header: NoteHeader) {
         self.header = header;
     }
+
+    // Broadcasts the note as an encrypted log on L1.
+    fn broadcast(self, context: &mut PrivateContext, slot: Field) {
+        let encryption_pub_key = get_public_key(self.requester_address.address);
+
+        emit_encrypted_log(
+            context,
+            (*context).this_address(),
+            slot,
+            encryption_pub_key,
+            self.serialize(),
+        );
+    }
 }
 
 fn deserialize(preimage: [Field; QUESTION_NOTE_LEN]) -> QuestionNote {
@@ -101,6 +119,10 @@ fn set_header(note: &mut QuestionNote, header: NoteHeader) {
     note.set_header(header)
 }
 
+fn broadcast(context: &mut PrivateContext, slot: Field, note: QuestionNote) {
+    note.broadcast(context, slot);
+}
+
 global QuestionNoteMethods = NoteInterface {
     deserialize,
     serialize,
@@ -108,4 +130,5 @@ global QuestionNoteMethods = NoteInterface {
     compute_nullifier,
     get_header,
     set_header,
+    broadcast
 };

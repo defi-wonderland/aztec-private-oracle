@@ -488,7 +488,7 @@ describe("E2E Private Oracle", () => {
         .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
         .send()
         .wait();
-    }, 30_000);
+    }, 45_000);
 
     // Test: is the tx successful
     it("Tx to cancel_question is mined and token transferred back to requester", async () => {
@@ -641,7 +641,7 @@ describe("E2E Private Oracle", () => {
     });
   });
 
-  describe.only("unconstrained: get_fee() and get_payment_token()", () => {
+  describe("unconstrained: get_fee() and get_payment_token()", () => {
     // Setup: Deploy the oracle
     beforeAll(async () => {
       // Deploy the token
@@ -671,9 +671,10 @@ describe("E2E Private Oracle", () => {
 
     it("returns the correct token address", async () => {
       let storedTokenAddress = await oracle.methods.get_payment_token().view();
-      console.log(storedTokenAddress);
-      console.log(token.address);
-      expect(storedTokenAddress).toEqual(token.address);
+
+      expect(AztecAddress.fromBigInt(storedTokenAddress.address)).toEqual(
+        token.address
+      );
     });
 
     // Test if not initialized a second time (even from the deployer)

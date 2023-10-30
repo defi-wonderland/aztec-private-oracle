@@ -69,11 +69,12 @@ const addPendingShieldNoteToPXE = async (
 beforeAll(async () => {
   const { SANDBOX_URL = "http://localhost:8080" } = process.env;
   pxe = createPXEClient(SANDBOX_URL);
-  await waitForSandbox(pxe);
 
-  [requester, requester2, divinity] = await getSandboxAccountsWallets(pxe);
-
-  deployer = await createAccount(pxe);
+  [, [requester, requester2, divinity], deployer] = await Promise.all([
+    waitForSandbox(pxe),
+    getSandboxAccountsWallets(pxe),
+    createAccount(pxe),
+  ]);
 }, 30_000);
 
 describe("E2E Private Oracle", () => {
@@ -136,17 +137,24 @@ describe("E2E Private Oracle", () => {
 
       expect(receipt.status).toBe("mined");
 
-      let requesterBalance = await token
-        .withWallet(requester)
-        .methods.balance_of_private(requester.getAddress())
-        .view();
+      // let requesterBalance = await token
+      //   .withWallet(requester)
+      //   .methods.balance_of_private(requester.getAddress())
+      //   .view();
+
+      // let oracleBalance = await token.methods
+      //   .balance_of_public(oracle.address)
+      //   .view();
+
+      let [requesterBalance, oracleBalance] = await Promise.all([
+        token
+          .withWallet(requester)
+          .methods.balance_of_private(requester.getAddress())
+          .view(),
+        token.methods.balance_of_public(oracle.address).view(),
+      ]);
 
       expect(requesterBalance).toEqual(MINT_AMOUNT - FEE);
-
-      let oracleBalance = await token.methods
-        .balance_of_public(oracle.address)
-        .view();
-
       expect(oracleBalance).toEqual(FEE);
     });
 
@@ -221,18 +229,21 @@ describe("E2E Private Oracle", () => {
         .send()
         .wait();
 
-      // Get the private storage for the divinity's question slot
-      const divinityRequestsNotes = await pxe.getPrivateStorageAt(
-        divinity.getAddress(),
-        oracle.address,
-        QUESTIONS_SLOT
-      );
-
-      // Get the private storage for the *other* requester's question slot
-      const requesterRequestsNotes = await pxe.getPrivateStorageAt(
-        requester2.getAddress(),
-        oracle.address,
-        QUESTIONS_SLOT
+      const [divinityRequestsNotes, requesterRequestsNotes] = await Promise.all(
+        [
+          // Get the private storage for the divinity's question slot
+          pxe.getPrivateStorageAt(
+            divinity.getAddress(),
+            oracle.address,
+            QUESTIONS_SLOT
+          ),
+          // Get the private storage for the *other* requester's question slot
+          pxe.getPrivateStorageAt(
+            requester2.getAddress(),
+            oracle.address,
+            QUESTIONS_SLOT
+          ),
+        ]
       );
 
       // Check: Compare the note's data with the expected values (this is the second note for the divnity)
@@ -318,16 +329,12 @@ describe("E2E Private Oracle", () => {
 
       expect(receipt.status).toBe("mined");
 
-      let divinityBalance = await token.methods
-        .balance_of_public(divinity.getAddress())
-        .view();
+      let [divinityBalance, oracleBalance] = await Promise.all([
+        token.methods.balance_of_public(divinity.getAddress()).view(),
+        token.methods.balance_of_public(oracle.address).view(),
+      ]);
 
       expect(divinityBalance).toEqual(FEE);
-
-      let oracleBalance = await token.methods
-        .balance_of_public(oracle.address)
-        .view();
-
       expect(oracleBalance).toEqual(0n);
     });
 
@@ -500,23 +507,25 @@ describe("E2E Private Oracle", () => {
 
       expect(receipt.status).toBe("mined");
 
-      let requesterBalance = await token
-        .withWallet(requester)
-        .methods.balance_of_private(requester.getAddress())
-        .view();
+      let [requesterBalance, requesterBalanceUnshielded, oracleBalance] =
+        await Promise.all([
+          token
+            .withWallet(requester)
+            .methods.balance_of_private(requester.getAddress())
+            .view(),
 
-      // Refunded portion is unshielded
-      requesterBalance += await token.methods
-        .balance_of_public(requester.getAddress())
-        .view();
+          // Refunded portion is unshielded
+          token.methods.balance_of_public(requester.getAddress()).view(),
 
-      expect(requesterBalance).toEqual(MINT_AMOUNT);
+          token
+            .withWallet(requester)
+            .methods.balance_of_public(oracle.address)
+            .view(),
+        ]);
 
-      let oracleBalance = await token
-        .withWallet(requester)
-        .methods.balance_of_public(oracle.address)
-        .view();
-
+      expect(requesterBalance + requesterBalanceUnshielded).toEqual(
+        MINT_AMOUNT
+      );
       expect(oracleBalance).toEqual(0n);
     });
 

@@ -462,7 +462,7 @@ describe("E2E Private Oracle", () => {
       const requester2AnswersNotes = await pxe.getNotes({
         owner: requester2.getAddress(),
         contractAddress: oracle.address,
-        storageSlot: QUESTIONS_SLOT,
+        storageSlot: ANSWERS_SLOT,
       });
 
       // Check: Compare the note's data with the expected values: the answer is the same as the first one and not the new one
@@ -743,14 +743,6 @@ const addTokenAndFeeNotesToPXE = async (
   txHash: TxHash
 ) => {
   // Add note for the payment token
-  // await pxe.addNote(
-  //   requester,
-  //   oracle,
-  //   new Fr(1), // The storage slot for the payment_token
-  //   new NotePreimage([token.toField()]),
-  //   txHash
-  // );
-
   await pxe.addNote(
     new ExtendedNote(
       new Note([token.toField()]),
@@ -762,14 +754,6 @@ const addTokenAndFeeNotesToPXE = async (
   );
 
   // Add note for the fee
-  // await pxe.addNote(
-  //   requester,
-  //   oracle,
-  //   new Fr(2), // The storage slot for the fee
-  //   new NotePreimage([new Fr(fee)]),
-  //   txHash
-  // );
-
   await pxe.addNote(
     new ExtendedNote(
       new Note([new Fr(fee)]),

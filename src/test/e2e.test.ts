@@ -1,38 +1,21 @@
-import { createSandbox } from "@aztec/aztec-sandbox";
 import {
-  AccountWallet,
-  CheatCodes,
   Fr,
-  L2BlockL2Logs,
   PXE,
-  UnencryptedL2Log,
   computeMessageSecretHash,
   createAccount,
   createPXEClient,
-  createDebugLogger,
   getSandboxAccountsWallets,
   waitForSandbox,
   AztecAddress,
   AccountWalletWithPrivateKey,
-  EthAddress,
   computeAuthWitMessageHash,
   TxHash,
-  FunctionCall,
   ExtendedNote,
   Note,
 } from "@aztec/aztec.js";
-import { toBigIntBE } from "@aztec/foundation/bigint-buffer";
-import { format } from "util";
 
 import { TokenContract } from "@aztec/noir-contracts/types";
 import { PrivateOracleContract } from "../../types/PrivateOracle.js";
-
-import {
-  CompleteAddress,
-  FunctionData,
-  HistoricBlockData,
-} from "@aztec/circuits.js";
-import { FunctionSelector, encodeArguments } from "@aztec/foundation/abi";
 
 const {
   SANDBOX_URL = "http://localhost:8080",
@@ -43,8 +26,6 @@ const PAYMENT_TOKEN_SLOT: Fr = new Fr(1);
 const FEE_SLOT: Fr = new Fr(2);
 const QUESTIONS_SLOT: Fr = new Fr(3);
 const ANSWERS_SLOT: Fr = new Fr(4);
-const PAYMENT_TOKEN_PUBLIC_SLOT: Fr = new Fr(5);
-const FEE_PUBLIC_SLOT: Fr = new Fr(6);
 
 const QUESTION = 123n;
 const ANSWER = 456n;
@@ -60,25 +41,6 @@ let requester: AccountWalletWithPrivateKey;
 let requester2: AccountWalletWithPrivateKey;
 let divinity: AccountWalletWithPrivateKey;
 let deployer: AccountWalletWithPrivateKey;
-
-const addPendingShieldNoteToPXE = async (
-  account: AccountWalletWithPrivateKey,
-  amount: bigint,
-  secretHash: Fr,
-  txHash: TxHash
-) => {
-  const storageSlot = new Fr(5); // The storage slot of `pending_shields` is 5.
-
-  await pxe.addNote(
-    new ExtendedNote(
-      new Note([new Fr(amount), secretHash]),
-      account.getAddress(),
-      token.address,
-      storageSlot,
-      txHash
-    )
-  );
-};
 
 // Setup: Set the sandbox
 beforeAll(async () => {
@@ -151,15 +113,6 @@ describe("E2E Private Oracle", () => {
         .wait();
 
       expect(receipt.status).toBe("mined");
-
-      // let requesterBalance = await token
-      //   .withWallet(requester)
-      //   .methods.balance_of_private(requester.getAddress())
-      //   .view();
-
-      // let oracleBalance = await token.methods
-      //   .balance_of_public(oracle.address)
-      //   .view();
 
       let [requesterBalance, oracleBalance] = await Promise.all([
         token
@@ -742,24 +695,45 @@ const addTokenAndFeeNotesToPXE = async (
   fee: bigint,
   txHash: TxHash
 ) => {
-  // Add note for the payment token
-  await pxe.addNote(
-    new ExtendedNote(
-      new Note([token.toField()]),
-      requester,
-      oracle,
-      PAYMENT_TOKEN_SLOT,
-      txHash
-    )
-  );
+  await Promise.all([
+    // Add note for the payment token
+    pxe.addNote(
+      new ExtendedNote(
+        new Note([token.toField()]),
+        requester,
+        oracle,
+        PAYMENT_TOKEN_SLOT,
+        txHash
+      )
+    ),
 
-  // Add note for the fee
+    // Add note for the fee
+    pxe.addNote(
+      new ExtendedNote(
+        new Note([new Fr(fee)]),
+        requester,
+        oracle,
+        FEE_SLOT,
+        txHash
+      )
+    ),
+  ]);
+};
+
+const addPendingShieldNoteToPXE = async (
+  account: AccountWalletWithPrivateKey,
+  amount: bigint,
+  secretHash: Fr,
+  txHash: TxHash
+) => {
+  const storageSlot = new Fr(5); // The storage slot of `pending_shields` is 5.
+
   await pxe.addNote(
     new ExtendedNote(
-      new Note([new Fr(fee)]),
-      requester,
-      oracle,
-      FEE_SLOT,
+      new Note([new Fr(amount), secretHash]),
+      account.getAddress(),
+      token.address,
+      storageSlot,
       txHash
     )
   );

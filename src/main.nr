@@ -308,6 +308,43 @@ contract PrivateOracle {
         );
     }
 
+    unconstrained fn get_answers(owner: AztecAddress) -> [Option<AnswerNote>; 10] {
+        // MAX_NOTES_PER_PAGE == 10
+        // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
+
+        //TODO: paginate
+        // create the filter
+        let answer_getter_option = NoteViewerOptions::new().select(4, owner.address);
+
+        // filter the notes and return the answer-
+        storage.answers.view_notes(answer_getter_option)
+    }        
+
+    unconstrained fn get_questions(requester: AztecAddress) -> [Option<QuestionNote>; 10] {
+        // MAX_NOTES_PER_PAGE == 10
+        // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
+
+        //TODO: paginate
+        // create the filter
+        let question_getter_option = NoteViewerOptions::new().select(1, requester.address);
+
+        // filter the notes and return the answer-
+        storage.questions.view_notes(question_getter_option)
+    }
+
+    // Returns the questions pending to answer for a given divinity
+    unconstrained fn get_pending_questions(divinity: AztecAddress) -> [Option<QuestionNote>; 10] {
+        // MAX_NOTES_PER_PAGE == 10
+        // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
+
+        //TODO: paginate
+        // create the filter
+        let question_getter_option = NoteViewerOptions::new().select(2, divinity.address);
+
+        // filter the notes and return the answer-
+        storage.questions.view_notes(question_getter_option)
+    }
+
     // Get the answer to a question - unconstrained. Returns all answers to the same questions, from all the divinities
     // Obviously, only the question from the sender can be read
     unconstrained fn get_answer_unconstrained(question: Field, note_owner: AztecAddress) -> AnswerNote {

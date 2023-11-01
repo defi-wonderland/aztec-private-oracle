@@ -89,7 +89,7 @@ contract PrivateOracle {
     }
 
     impl Storage {
-        fn init(context: Context) -> pub Self {
+        fn init(context: Context) -> Self {
             Storage {
                 
                 // -- Private --
@@ -146,7 +146,7 @@ contract PrivateOracle {
         let sender = AztecAddress::new(context.msg_sender());
 
         // Take the payment from the user
-        TokenPrivateContextInterface::at(payment_token.address).unshield(
+        let _ = TokenPrivateContextInterface::at(payment_token.address).unshield(
             &mut context, 
             FromUnshieldStruct { address: sender.address }, 
             ToUnshieldStruct { address: address_this.address }, 

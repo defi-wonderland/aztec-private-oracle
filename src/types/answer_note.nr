@@ -68,6 +68,7 @@ impl AnswerNote {
     // still returning a value (instead of assert(false) for instance) as we need it for compute_note_hash_for_read_or_nullify
     // to emit encrypte logs
     fn compute_nullifier(self) -> Field {
+        let _ = self; // Avoid compiler warning (same # acir opcodes and backend size)
         0
     }
 

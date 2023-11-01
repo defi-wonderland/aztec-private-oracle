@@ -45,6 +45,7 @@ impl FeeNote {
     }
 
     fn compute_nullifier(self) -> Field {
+        let _ = self; // Avoid compiler warning (same # acir opcodes and backend size)
          0
     }
 
@@ -54,6 +55,9 @@ impl FeeNote {
 
     fn broadcast(self, context: &mut PrivateContext, slot: Field) {
         // no owner == no broadcast
+        let _ = self; // Avoid compiler warning (same # acir opcodes and backend size)
+        let __ = context;
+        let ___ = slot;
     }
 }
 

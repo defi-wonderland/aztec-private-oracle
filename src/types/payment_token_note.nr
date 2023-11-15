@@ -43,12 +43,13 @@ impl PaymentTokenNote {
     }
 
     fn compute_note_hash(self) -> Field {
-        dep::std::hash::pedersen([
+        dep::std::hash::pedersen_hash([
             self.payment_token.address
-        ])[0]
+        ])
     }
 
     fn compute_nullifier(self) -> Field {
+        let _ = self; // Avoid compiler warning (same # acir opcodes and backend size)
          0
     }
 
@@ -57,6 +58,9 @@ impl PaymentTokenNote {
     }
 
     fn broadcast(self, context: &mut PrivateContext, slot: Field) {
+        let _ = self; // Avoid compiler warning (same # acir opcodes and backend size)
+        let __ = context;
+        let ___ = slot;
     }
 }
 

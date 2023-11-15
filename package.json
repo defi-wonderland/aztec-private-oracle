@@ -23,11 +23,11 @@
     "rootDir": "./src"
   },
   "dependencies": {
-    "@aztec/aztec-sandbox": "0.13.1",
-    "@aztec/aztec.js": "0.13.1",
-    "@aztec/cli": "0.13.1",
-    "@aztec/foundation": "0.13.1",
-    "@aztec/types": "0.13.1",
+    "@aztec/aztec-sandbox": "0.14.2",
+    "@aztec/aztec.js": "0.14.2",
+    "@aztec/cli": "0.14.2",
+    "@aztec/foundation": "0.14.2",
+    "@aztec/types": "0.14.2",
     "@types/jest": "^29.5.5",
     "jest": "^29.7.0",
     "ts-jest": "^29.1.1",

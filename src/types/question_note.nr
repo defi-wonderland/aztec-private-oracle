@@ -64,17 +64,17 @@ impl QuestionNote {
     }
 
     fn compute_note_hash(self) -> Field {
-        dep::std::hash::pedersen(serialize(self))[0]
+        dep::std::hash::pedersen_hash(serialize(self))
     }
 
     fn compute_nullifier(self) -> Field {
         let note_hash_for_nullify = compute_note_hash_for_read_or_nullify(QuestionNoteMethods, self);
         let nullifier_key = self.shared_nullifier_key;
 
-        dep::std::hash::pedersen([
+        dep::std::hash::pedersen_hash([
             note_hash_for_nullify,
             nullifier_key,
-        ])[0]
+        ])
     }
 
     fn set_header(&mut self, header: NoteHeader) {

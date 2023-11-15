@@ -52,7 +52,7 @@ beforeAll(async () => {
     getSandboxAccountsWallets(pxe),
     createAccount(pxe),
   ]);
-}, 30_000);
+}, 60_000);
 
 describe("E2E Private Oracle", () => {
   describe("submit_question(..)", () => {
@@ -87,7 +87,7 @@ describe("E2E Private Oracle", () => {
         FEE,
         receipt.txHash
       );
-    }, 30_000);
+    }, 60_000);
 
     it("Requester has tokens", async () => {
       let requesterBalance = await token
@@ -240,7 +240,7 @@ describe("E2E Private Oracle", () => {
       expect(divinityRequestsNotes[1].note.items[3]).not.toEqual(
         shared_key_nullifier_divinity
       );
-    }, 30_000);
+    }, 60_000);
   });
 
   describe("submit_answer(..)", () => {
@@ -284,7 +284,7 @@ describe("E2E Private Oracle", () => {
         .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
         .send()
         .wait();
-    }, 30_000);
+    }, 60_000);
 
     // Test: is the tx successful
     it("Tx to submit_answer is mined and tokens are transferred to the divinity", async () => {
@@ -571,7 +571,7 @@ describe("E2E Private Oracle", () => {
         .methods.submit_answer(QUESTION, requester.getAddress(), ANSWER)
         .send()
         .wait();
-    }, 45_000);
+    }, 60_000);
 
     it("get_answer returns the correct answer to the requester", async () => {
       // Get the answer

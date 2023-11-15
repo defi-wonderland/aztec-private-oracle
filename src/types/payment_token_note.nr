@@ -43,9 +43,9 @@ impl PaymentTokenNote {
     }
 
     fn compute_note_hash(self) -> Field {
-        dep::std::hash::pedersen([
+        dep::std::hash::pedersen_hash([
             self.payment_token.address
-        ])[0]
+        ])
     }
 
     fn compute_nullifier(self) -> Field {

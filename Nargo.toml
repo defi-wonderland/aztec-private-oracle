@@ -2,7 +2,7 @@
 name = "privateoracle"
 type = "contract"
 authors = ["wonderland"]
-compiler_version = "0.17.0"
+compiler_version = "^0.18.0"
 
 [dependencies]
-aztec = { git="https://github.com/AztecProtocol/aztec-packages/", tag="aztec-packages-v0.13.1", directory="yarn-project/aztec-nr/aztec" }
+aztec = { git="https://github.com/AztecProtocol/aztec-packages/", tag="aztec-packages-v0.14.2", directory="yarn-project/aztec-nr/aztec" }

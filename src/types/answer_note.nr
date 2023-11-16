@@ -55,19 +55,20 @@ impl AnswerNote {
     }
 
     fn compute_note_hash(self) -> Field {
-        dep::std::hash::pedersen([
+        dep::std::hash::pedersen_hash([
             self.request,
             self.answer,
             self.requester.address,
             self.divinity.address,
             self.owner.address
-        ])[0]
+        ])
     }
 
     // No nullifier needed -> only one divinity has access to the original request and the answer cannot change ever
     // still returning a value (instead of assert(false) for instance) as we need it for compute_note_hash_for_read_or_nullify
     // to emit encrypte logs
     fn compute_nullifier(self) -> Field {
+        let _ = self; // Avoid compiler warning (same # acir opcodes and backend size)
         0
     }
 

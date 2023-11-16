@@ -524,6 +524,184 @@ describe("E2E Private Oracle", () => {
     });
   });
 
+  describe.only("unconstrained: get_answers_unconstrained(..)", () => {
+    // Setup: Deploy the oracle and submit 3 questions
+    beforeAll(async () => {
+      // Deploy the token
+      token = await TokenContract.deploy(deployer, requester.getAddress())
+        .send()
+        .deployed();
+
+      // Mint tokens for the requester
+      await mintTokenFor(requester, requester, MINT_AMOUNT);
+
+      // Deploy the oracle
+      const receipt = PrivateOracleContract.deploy(
+        deployer,
+        token.address,
+        FEE
+      ).send();
+      oracle = await receipt.deployed();
+
+      await addTokenAndFeeNotesToPXE(
+        requester.getAddress(),
+        oracle.address,
+        token.address,
+        FEE,
+        await receipt.getTxHash()
+      );
+
+      const [nonce, nonce1, nonce2] = await Promise.all([
+        createAuthUnshieldMessage(token, requester, oracle.address, FEE),
+        createAuthUnshieldMessage(token, requester, oracle.address, FEE),
+        createAuthUnshieldMessage(token, requester, oracle.address, FEE),
+      ]);
+
+      // Submit the questions
+      // await Promise.all([
+      await oracle
+        .withWallet(requester)
+        .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
+        .send()
+        .wait();
+      await oracle
+        .withWallet(requester)
+        .methods.submit_question(QUESTION + 1n, divinity.getAddress(), nonce1)
+        .send()
+        .wait();
+      await oracle
+        .withWallet(requester)
+        .methods.submit_question(QUESTION + 2n, divinity.getAddress(), nonce2)
+        .send()
+        .wait();
+      // ]);
+
+      // Submit the answers
+
+      // await Promise.all([
+      await oracle
+        .withWallet(divinity)
+        .methods.submit_answer(QUESTION, requester.getAddress(), ANSWER)
+        .send()
+        .wait();
+      await oracle
+        .withWallet(divinity)
+        .methods.submit_answer(
+          QUESTION + 1n,
+          requester.getAddress(),
+          ANSWER + 1n
+        )
+        .send()
+        .wait();
+      await oracle
+        .withWallet(divinity)
+        .methods.submit_answer(
+          QUESTION + 2n,
+          requester.getAddress(),
+          ANSWER + 2n
+        )
+        .send()
+        .wait();
+      // ]);
+    }, 120_000);
+
+    it("get_answer returns the correct answers to the requester", async () => {
+      // get the answers
+      const answer = await oracle
+        .withWallet(requester)
+        .methods.get_answers_unconstrained(requester.getAddress())
+        .view({ from: requester.getAddress() });
+
+      console.log(answer);
+
+      // Check: Compare the answer with the expected value
+      expect(answer[0]._is_some).toBeTruthy;
+      expect(answer[0]._value.request).toEqual(QUESTION);
+      expect(answer[0]._value.answer).toEqual(ANSWER);
+      expect(
+        AztecAddress.fromBigInt(answer[0]._value.requester.address)
+      ).toEqual(requester.getAddress());
+      expect(
+        AztecAddress.fromBigInt(answer[0]._value.divinity.address)
+      ).toEqual(divinity.getAddress());
+      expect(AztecAddress.fromBigInt(answer[0]._value.owner.address)).toEqual(
+        requester.getAddress()
+      );
+
+      expect(answer[1]._value.request).toEqual(QUESTION + 1n);
+      expect(answer[1]._value.answer).toEqual(ANSWER + 1n);
+      expect(
+        AztecAddress.fromBigInt(answer[1]._value.requester.address)
+      ).toEqual(requester.getAddress());
+      expect(
+        AztecAddress.fromBigInt(answer[1]._value.divinity.address)
+      ).toEqual(divinity.getAddress());
+      expect(AztecAddress.fromBigInt(answer[1]._value.owner.address)).toEqual(
+        requester.getAddress()
+      );
+
+      expect(answer[2]._value.request).toEqual(QUESTION + 2n);
+      expect(answer[2]._value.answer).toEqual(ANSWER + 2n);
+      expect(
+        AztecAddress.fromBigInt(answer[2]._value.requester.address)
+      ).toEqual(requester.getAddress());
+      expect(
+        AztecAddress.fromBigInt(answer[2]._value.divinity.address)
+      ).toEqual(divinity.getAddress());
+      expect(AztecAddress.fromBigInt(answer[2]._value.owner.address)).toEqual(
+        requester.getAddress()
+      );
+    });
+
+    it("get_answer returns the correct answers to the divinity", async () => {
+      // get the answers
+      const answer = await oracle
+        .withWallet(divinity)
+        .methods.get_answers_unconstrained(divinity.getAddress())
+        .view({ from: divinity.getAddress() });
+
+      console.log(answer);
+
+      // Check: Compare the answer with the expected value
+      expect(answer[0]._is_some).toBeTruthy;
+      expect(answer[0]._value.request).toEqual(QUESTION);
+      expect(answer[0]._value.answer).toEqual(ANSWER);
+      expect(
+        AztecAddress.fromBigInt(answer[0]._value.requester.address)
+      ).toEqual(requester.getAddress());
+      expect(
+        AztecAddress.fromBigInt(answer[0]._value.divinity.address)
+      ).toEqual(divinity.getAddress());
+      expect(AztecAddress.fromBigInt(answer[0]._value.owner.address)).toEqual(
+        divinity.getAddress()
+      );
+
+      expect(answer[1]._value.request).toEqual(QUESTION + 1n);
+      expect(answer[1]._value.answer).toEqual(ANSWER + 1n);
+      expect(
+        AztecAddress.fromBigInt(answer[1]._value.requester.address)
+      ).toEqual(requester.getAddress());
+      expect(
+        AztecAddress.fromBigInt(answer[1]._value.divinity.address)
+      ).toEqual(divinity.getAddress());
+      expect(AztecAddress.fromBigInt(answer[1]._value.owner.address)).toEqual(
+        divinity.getAddress()
+      );
+
+      expect(answer[2]._value.request).toEqual(QUESTION + 2n);
+      expect(answer[2]._value.answer).toEqual(ANSWER + 2n);
+      expect(
+        AztecAddress.fromBigInt(answer[2]._value.requester.address)
+      ).toEqual(requester.getAddress());
+      expect(
+        AztecAddress.fromBigInt(answer[2]._value.divinity.address)
+      ).toEqual(divinity.getAddress());
+      expect(AztecAddress.fromBigInt(answer[2]._value.owner.address)).toEqual(
+        divinity.getAddress()
+      );
+    });
+  });
+
   describe("unconstrained: get_answer_unconstrained(..)", () => {
     // Setup: Deploy the oracle and submit a question
     beforeAll(async () => {

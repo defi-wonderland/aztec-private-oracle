@@ -308,7 +308,7 @@ contract PrivateOracle {
         );
     }
 
-    unconstrained fn get_answers(owner: AztecAddress) -> [Option<AnswerNote>; 10] {
+    unconstrained fn get_answers_unconstrained(owner: AztecAddress) -> [Option<AnswerNote>; 10] {
         // MAX_NOTES_PER_PAGE == 10
         // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
 
@@ -320,7 +320,7 @@ contract PrivateOracle {
         storage.answers.view_notes(answer_getter_option)
     }        
 
-    unconstrained fn get_questions(requester: AztecAddress) -> [Option<QuestionNote>; 10] {
+    unconstrained fn get_questions_unconstrained(requester: AztecAddress) -> [Option<QuestionNote>; 10] {
         // MAX_NOTES_PER_PAGE == 10
         // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
 
@@ -333,7 +333,7 @@ contract PrivateOracle {
     }
 
     // Returns the questions pending to answer for a given divinity
-    unconstrained fn get_pending_questions(divinity: AztecAddress) -> [Option<QuestionNote>; 10] {
+    unconstrained fn get_pending_questions_unconstrained(divinity: AztecAddress) -> [Option<QuestionNote>; 10] {
         // MAX_NOTES_PER_PAGE == 10
         // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
 

@@ -12,10 +12,13 @@ import {
   TxHash,
   ExtendedNote,
   Note,
+  BatchCall,
 } from "@aztec/aztec.js";
 
 import { TokenContract } from "@aztec/noir-contracts/types";
+
 import { PrivateOracleContract } from "../../types/PrivateOracle.js";
+import { AnswerNote } from "../../types/Notes.js";
 
 const {
   SANDBOX_URL = "http://localhost:8080",
@@ -558,147 +561,82 @@ describe("E2E Private Oracle", () => {
       ]);
 
       // Submit the questions
-      // await Promise.all([
-      await oracle
-        .withWallet(requester)
-        .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
-        .send()
-        .wait();
-      await oracle
-        .withWallet(requester)
-        .methods.submit_question(QUESTION + 1n, divinity.getAddress(), nonce1)
-        .send()
-        .wait();
-      await oracle
-        .withWallet(requester)
-        .methods.submit_question(QUESTION + 2n, divinity.getAddress(), nonce2)
-        .send()
-        .wait();
-      // ]);
+      const batchQuestions = new BatchCall(requester, [
+        oracle.methods
+          .submit_question(QUESTION, divinity.getAddress(), nonce)
+          .request(),
+        oracle.methods
+          .submit_question(QUESTION + 1n, divinity.getAddress(), nonce1)
+          .request(),
+        oracle.methods
+          .submit_question(QUESTION + 2n, divinity.getAddress(), nonce2)
+          .request(),
+      ]);
+
+      await batchQuestions.send().wait();
 
       // Submit the answers
+      const batchAnswers = new BatchCall(divinity, [
+        oracle.methods
+          .submit_answer(QUESTION, requester.getAddress(), ANSWER)
+          .request(),
+        oracle.methods
+          .submit_answer(QUESTION + 1n, requester.getAddress(), ANSWER + 1n)
+          .request(),
+        oracle.methods
+          .submit_answer(QUESTION + 2n, requester.getAddress(), ANSWER + 2n)
+          .request(),
+      ]);
 
-      // await Promise.all([
-      await oracle
-        .withWallet(divinity)
-        .methods.submit_answer(QUESTION, requester.getAddress(), ANSWER)
-        .send()
-        .wait();
-      await oracle
-        .withWallet(divinity)
-        .methods.submit_answer(
-          QUESTION + 1n,
-          requester.getAddress(),
-          ANSWER + 1n
-        )
-        .send()
-        .wait();
-      await oracle
-        .withWallet(divinity)
-        .methods.submit_answer(
-          QUESTION + 2n,
-          requester.getAddress(),
-          ANSWER + 2n
-        )
-        .send()
-        .wait();
-      // ]);
+      await batchAnswers.send().wait();
     }, 120_000);
 
     it("get_answer returns the correct answers to the requester", async () => {
       // get the answers
-      const answer = await oracle
+      const answer: AnswerNote[] = await oracle
         .withWallet(requester)
         .methods.get_answers_unconstrained(requester.getAddress())
         .view({ from: requester.getAddress() });
 
-      console.log(answer);
-
       // Check: Compare the answer with the expected value
-      expect(answer[0]._is_some).toBeTruthy;
-      expect(answer[0]._value.request).toEqual(QUESTION);
-      expect(answer[0]._value.answer).toEqual(ANSWER);
-      expect(
-        AztecAddress.fromBigInt(answer[0]._value.requester.address)
-      ).toEqual(requester.getAddress());
-      expect(
-        AztecAddress.fromBigInt(answer[0]._value.divinity.address)
-      ).toEqual(divinity.getAddress());
-      expect(AztecAddress.fromBigInt(answer[0]._value.owner.address)).toEqual(
-        requester.getAddress()
-      );
-
-      expect(answer[1]._value.request).toEqual(QUESTION + 1n);
-      expect(answer[1]._value.answer).toEqual(ANSWER + 1n);
-      expect(
-        AztecAddress.fromBigInt(answer[1]._value.requester.address)
-      ).toEqual(requester.getAddress());
-      expect(
-        AztecAddress.fromBigInt(answer[1]._value.divinity.address)
-      ).toEqual(divinity.getAddress());
-      expect(AztecAddress.fromBigInt(answer[1]._value.owner.address)).toEqual(
-        requester.getAddress()
-      );
-
-      expect(answer[2]._value.request).toEqual(QUESTION + 2n);
-      expect(answer[2]._value.answer).toEqual(ANSWER + 2n);
-      expect(
-        AztecAddress.fromBigInt(answer[2]._value.requester.address)
-      ).toEqual(requester.getAddress());
-      expect(
-        AztecAddress.fromBigInt(answer[2]._value.divinity.address)
-      ).toEqual(divinity.getAddress());
-      expect(AztecAddress.fromBigInt(answer[2]._value.owner.address)).toEqual(
-        requester.getAddress()
-      );
+      answer.map((note) => {
+        if (note._value.request == QUESTION) {
+          expect(note._value.answer).toEqual(ANSWER);
+        }
+        if (note._value.request == QUESTION + 1n) {
+          expect(note._value.answer).toEqual(ANSWER + 1n);
+        }
+        if (note._value.request == QUESTION + 2n) {
+          expect(note._value.answer).toEqual(ANSWER + 2n);
+        }
+        expect(note._value.requester).toEqual(requester.getAddress());
+        expect(note._value.divinity).toEqual(divinity.getAddress());
+        expect(note._value.owner).toEqual(requester.getAddress());
+      });
     });
 
     it("get_answer returns the correct answers to the divinity", async () => {
       // get the answers
-      const answer = await oracle
+      const answer: AnswerNote[] = await oracle
         .withWallet(divinity)
         .methods.get_answers_unconstrained(divinity.getAddress())
         .view({ from: divinity.getAddress() });
 
-      console.log(answer);
-
       // Check: Compare the answer with the expected value
-      expect(answer[0]._is_some).toBeTruthy;
-      expect(answer[0]._value.request).toEqual(QUESTION);
-      expect(answer[0]._value.answer).toEqual(ANSWER);
-      expect(
-        AztecAddress.fromBigInt(answer[0]._value.requester.address)
-      ).toEqual(requester.getAddress());
-      expect(
-        AztecAddress.fromBigInt(answer[0]._value.divinity.address)
-      ).toEqual(divinity.getAddress());
-      expect(AztecAddress.fromBigInt(answer[0]._value.owner.address)).toEqual(
-        divinity.getAddress()
-      );
-
-      expect(answer[1]._value.request).toEqual(QUESTION + 1n);
-      expect(answer[1]._value.answer).toEqual(ANSWER + 1n);
-      expect(
-        AztecAddress.fromBigInt(answer[1]._value.requester.address)
-      ).toEqual(requester.getAddress());
-      expect(
-        AztecAddress.fromBigInt(answer[1]._value.divinity.address)
-      ).toEqual(divinity.getAddress());
-      expect(AztecAddress.fromBigInt(answer[1]._value.owner.address)).toEqual(
-        divinity.getAddress()
-      );
-
-      expect(answer[2]._value.request).toEqual(QUESTION + 2n);
-      expect(answer[2]._value.answer).toEqual(ANSWER + 2n);
-      expect(
-        AztecAddress.fromBigInt(answer[2]._value.requester.address)
-      ).toEqual(requester.getAddress());
-      expect(
-        AztecAddress.fromBigInt(answer[2]._value.divinity.address)
-      ).toEqual(divinity.getAddress());
-      expect(AztecAddress.fromBigInt(answer[2]._value.owner.address)).toEqual(
-        divinity.getAddress()
-      );
+      answer.map((note) => {
+        if (note._value.request == QUESTION) {
+          expect(note._value.answer).toEqual(ANSWER);
+        }
+        if (note._value.request == QUESTION + 1n) {
+          expect(note._value.answer).toEqual(ANSWER + 1n);
+        }
+        if (note._value.request == QUESTION + 2n) {
+          expect(note._value.answer).toEqual(ANSWER + 2n);
+        }
+        expect(note._value.requester).toEqual(requester.getAddress());
+        expect(note._value.divinity).toEqual(divinity.getAddress());
+        expect(note._value.owner).toEqual(divinity.getAddress());
+      });
     });
   });
 

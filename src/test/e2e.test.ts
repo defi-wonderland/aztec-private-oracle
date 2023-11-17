@@ -528,8 +528,15 @@ describe("E2E Private Oracle", () => {
   });
 
   describe.only("unconstrained: get_answers_unconstrained(..)", () => {
+    let ANSWER_NOTE_DIVINITY: AnswerNote[];
+    let ANSWER_NOTE_REQUESTER: AnswerNote[];
+
     // Setup: Deploy the oracle and submit 3 questions
     beforeAll(async () => {
+      // Create the answer notes we should get
+      ANSWER_NOTE_DIVINITY = createCorrectAnswerNotes(divinity);
+      ANSWER_NOTE_REQUESTER = createCorrectAnswerNotes(requester);
+
       // Deploy the token
       token = await TokenContract.deploy(deployer, requester.getAddress())
         .send()
@@ -554,22 +561,35 @@ describe("E2E Private Oracle", () => {
         await receipt.getTxHash()
       );
 
+      // Create 3 nonces for token transfer
       const [nonce, nonce1, nonce2] = await Promise.all([
         createAuthUnshieldMessage(token, requester, oracle.address, FEE),
         createAuthUnshieldMessage(token, requester, oracle.address, FEE),
         createAuthUnshieldMessage(token, requester, oracle.address, FEE),
       ]);
 
-      // Submit the questions
+      // Submit the questions (in a single batch for optimisation)
       const batchQuestions = new BatchCall(requester, [
         oracle.methods
-          .submit_question(QUESTION, divinity.getAddress(), nonce)
+          .submit_question(
+            ANSWER_NOTE_REQUESTER[0].request,
+            divinity.getAddress(),
+            nonce
+          )
           .request(),
         oracle.methods
-          .submit_question(QUESTION + 1n, divinity.getAddress(), nonce1)
+          .submit_question(
+            ANSWER_NOTE_REQUESTER[1].request,
+            divinity.getAddress(),
+            nonce1
+          )
           .request(),
         oracle.methods
-          .submit_question(QUESTION + 2n, divinity.getAddress(), nonce2)
+          .submit_question(
+            ANSWER_NOTE_REQUESTER[2].request,
+            divinity.getAddress(),
+            nonce2
+          )
           .request(),
       ]);
 
@@ -578,13 +598,25 @@ describe("E2E Private Oracle", () => {
       // Submit the answers
       const batchAnswers = new BatchCall(divinity, [
         oracle.methods
-          .submit_answer(QUESTION, requester.getAddress(), ANSWER)
+          .submit_answer(
+            ANSWER_NOTE_REQUESTER[0].request,
+            requester.getAddress(),
+            ANSWER_NOTE_REQUESTER[0].answer
+          )
           .request(),
         oracle.methods
-          .submit_answer(QUESTION + 1n, requester.getAddress(), ANSWER + 1n)
+          .submit_answer(
+            ANSWER_NOTE_REQUESTER[1].request,
+            requester.getAddress(),
+            ANSWER_NOTE_REQUESTER[1].answer
+          )
           .request(),
         oracle.methods
-          .submit_answer(QUESTION + 2n, requester.getAddress(), ANSWER + 2n)
+          .submit_answer(
+            ANSWER_NOTE_REQUESTER[2].request,
+            requester.getAddress(),
+            ANSWER_NOTE_REQUESTER[2].answer
+          )
           .request(),
       ]);
 
@@ -593,50 +625,28 @@ describe("E2E Private Oracle", () => {
 
     it("get_answer returns the correct answers to the requester", async () => {
       // get the answers
-      const answer: AnswerNote[] = await oracle
-        .withWallet(requester)
-        .methods.get_answers_unconstrained(requester.getAddress())
-        .view({ from: requester.getAddress() });
+      const answer: AnswerNote[] = (
+        await oracle
+          .withWallet(requester)
+          .methods.get_answers_unconstrained(requester.getAddress())
+          .view({ from: requester.getAddress() })
+      ).map((x: AnswerNote) => new AnswerNote(x));
 
-      // Check: Compare the answer with the expected value
-      answer.map((note) => {
-        if (note._value.request == QUESTION) {
-          expect(note._value.answer).toEqual(ANSWER);
-        }
-        if (note._value.request == QUESTION + 1n) {
-          expect(note._value.answer).toEqual(ANSWER + 1n);
-        }
-        if (note._value.request == QUESTION + 2n) {
-          expect(note._value.answer).toEqual(ANSWER + 2n);
-        }
-        expect(note._value.requester).toEqual(requester.getAddress());
-        expect(note._value.divinity).toEqual(divinity.getAddress());
-        expect(note._value.owner).toEqual(requester.getAddress());
-      });
+      // Check: are all answers included in the array (will return 10 notes, 3 and 7 which are uninitialized)
+      expect(answer).toEqual(expect.arrayContaining(ANSWER_NOTE_REQUESTER));
     });
 
     it("get_answer returns the correct answers to the divinity", async () => {
       // get the answers
-      const answer: AnswerNote[] = await oracle
-        .withWallet(divinity)
-        .methods.get_answers_unconstrained(divinity.getAddress())
-        .view({ from: divinity.getAddress() });
+      const answer: AnswerNote[] = (
+        await oracle
+          .withWallet(divinity)
+          .methods.get_answers_unconstrained(divinity.getAddress())
+          .view({ from: divinity.getAddress() })
+      ).map((x: AnswerNote) => new AnswerNote(x));
 
       // Check: Compare the answer with the expected value
-      answer.map((note) => {
-        if (note._value.request == QUESTION) {
-          expect(note._value.answer).toEqual(ANSWER);
-        }
-        if (note._value.request == QUESTION + 1n) {
-          expect(note._value.answer).toEqual(ANSWER + 1n);
-        }
-        if (note._value.request == QUESTION + 2n) {
-          expect(note._value.answer).toEqual(ANSWER + 2n);
-        }
-        expect(note._value.requester).toEqual(requester.getAddress());
-        expect(note._value.divinity).toEqual(divinity.getAddress());
-        expect(note._value.owner).toEqual(divinity.getAddress());
-      });
+      expect(answer).toEqual(expect.arrayContaining(ANSWER_NOTE_DIVINITY));
     });
   });
 
@@ -877,4 +887,35 @@ const mintTokenFor = async (
     .methods.redeem_shield(account.getAddress(), amount, secret)
     .send()
     .wait();
+};
+
+const createCorrectAnswerNotes = (
+  owner: AccountWalletWithPrivateKey
+): AnswerNote[] => {
+  return [
+    {
+      is_some: true,
+      request: QUESTION,
+      answer: ANSWER,
+      requester: requester.getAddress(),
+      divinity: divinity.getAddress(),
+      owner: owner.getAddress(),
+    },
+    {
+      is_some: true,
+      request: QUESTION + 1n,
+      answer: ANSWER + 1n,
+      requester: requester.getAddress(),
+      divinity: divinity.getAddress(),
+      owner: owner.getAddress(),
+    },
+    {
+      is_some: true,
+      request: QUESTION + 2n,
+      answer: ANSWER + 2n,
+      requester: requester.getAddress(),
+      divinity: divinity.getAddress(),
+      owner: owner.getAddress(),
+    },
+  ];
 };

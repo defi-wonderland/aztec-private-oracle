@@ -527,7 +527,7 @@ describe("E2E Private Oracle", () => {
     });
   });
 
-  describe.only("unconstrained: get_answers_unconstrained(..)", () => {
+  describe("unconstrained: get_answers_unconstrained(..)", () => {
     let ANSWER_NOTE_DIVINITY: AnswerNote[];
     let ANSWER_NOTE_REQUESTER: AnswerNote[];
 
@@ -562,65 +562,17 @@ describe("E2E Private Oracle", () => {
       );
 
       // Create 3 nonces for token transfer
-      const [nonce, nonce1, nonce2] = await Promise.all([
+      const nonces: Fr[] = await Promise.all([
         createAuthUnshieldMessage(token, requester, oracle.address, FEE),
         createAuthUnshieldMessage(token, requester, oracle.address, FEE),
         createAuthUnshieldMessage(token, requester, oracle.address, FEE),
       ]);
 
       // Submit the questions (in a single batch for optimisation)
-      const batchQuestions = new BatchCall(requester, [
-        oracle.methods
-          .submit_question(
-            ANSWER_NOTE_REQUESTER[0].request,
-            divinity.getAddress(),
-            nonce
-          )
-          .request(),
-        oracle.methods
-          .submit_question(
-            ANSWER_NOTE_REQUESTER[1].request,
-            divinity.getAddress(),
-            nonce1
-          )
-          .request(),
-        oracle.methods
-          .submit_question(
-            ANSWER_NOTE_REQUESTER[2].request,
-            divinity.getAddress(),
-            nonce2
-          )
-          .request(),
-      ]);
-
-      await batchQuestions.send().wait();
+      await sendQuestionsBatch(ANSWER_NOTE_REQUESTER, nonces);
 
       // Submit the answers
-      const batchAnswers = new BatchCall(divinity, [
-        oracle.methods
-          .submit_answer(
-            ANSWER_NOTE_REQUESTER[0].request,
-            requester.getAddress(),
-            ANSWER_NOTE_REQUESTER[0].answer
-          )
-          .request(),
-        oracle.methods
-          .submit_answer(
-            ANSWER_NOTE_REQUESTER[1].request,
-            requester.getAddress(),
-            ANSWER_NOTE_REQUESTER[1].answer
-          )
-          .request(),
-        oracle.methods
-          .submit_answer(
-            ANSWER_NOTE_REQUESTER[2].request,
-            requester.getAddress(),
-            ANSWER_NOTE_REQUESTER[2].answer
-          )
-          .request(),
-      ]);
-
-      await batchAnswers.send().wait();
+      await sendAnswersBatch(ANSWER_NOTE_REQUESTER);
     }, 120_000);
 
     it("get_answer returns the correct answers to the requester", async () => {
@@ -888,6 +840,51 @@ const mintTokenFor = async (
     .send()
     .wait();
 };
+
+const sendQuestionsBatch = async (answerNotes: AnswerNote[], nonces: Fr[]) => {
+  const batchQuestions = new BatchCall(requester, [
+    oracle.methods
+      .submit_question(answerNotes[0].request, divinity.getAddress(), nonces[0])
+      .request(),
+    oracle.methods
+      .submit_question(answerNotes[1].request, divinity.getAddress(), nonces[1])
+      .request(),
+    oracle.methods
+      .submit_question(answerNotes[2].request, divinity.getAddress(), nonces[2])
+      .request(),
+  ]);
+
+  await batchQuestions.send().wait();
+};
+
+const sendAnswersBatch = async (answerNotes: AnswerNote[]) => {
+  const batchAnswers = new BatchCall(divinity, [
+    oracle.methods
+      .submit_answer(
+        answerNotes[0].request,
+        requester.getAddress(),
+        answerNotes[0].answer
+      )
+      .request(),
+    oracle.methods
+      .submit_answer(
+        answerNotes[1].request,
+        requester.getAddress(),
+        answerNotes[1].answer
+      )
+      .request(),
+    oracle.methods
+      .submit_answer(
+        answerNotes[2].request,
+        requester.getAddress(),
+        answerNotes[2].answer
+      )
+      .request(),
+  ]);
+
+  await batchAnswers.send().wait();
+};
+
 
 const createCorrectAnswerNotes = (
   owner: AccountWalletWithPrivateKey

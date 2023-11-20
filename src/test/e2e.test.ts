@@ -18,7 +18,7 @@ import {
 import { TokenContract } from "@aztec/noir-contracts/types";
 
 import { PrivateOracleContract } from "../../types/PrivateOracle.js";
-import { AnswerNote } from "../../types/Notes.js";
+import { AnswerNote, QuestionNote } from "../../types/Notes.js";
 
 const {
   SANDBOX_URL = "http://localhost:8080",
@@ -527,15 +527,126 @@ describe("E2E Private Oracle", () => {
     });
   });
 
+  describe("unconstrained: get_questions_unconstrained(..)", () => {
+    let QUESTION_NOTE_DIVINITY: QuestionNote[];
+    let QUESTION_NOTE_REQUESTER: QuestionNote[];
+
+    // Setup: Deploy the oracle and submit 3 questions
+    beforeAll(async () => {
+      [QUESTION_NOTE_DIVINITY] = createCorrectNotes(divinity);
+      [QUESTION_NOTE_REQUESTER] = createCorrectNotes(requester);
+
+      // Deploy the token
+      token = await TokenContract.deploy(deployer, requester.getAddress())
+        .send()
+        .deployed();
+
+      // Mint tokens for the requester
+      await mintTokenFor(requester, requester, MINT_AMOUNT);
+
+      // Deploy the oracle
+      const receipt = PrivateOracleContract.deploy(
+        deployer,
+        token.address,
+        FEE
+      ).send();
+      oracle = await receipt.deployed();
+
+      await addTokenAndFeeNotesToPXE(
+        requester.getAddress(),
+        oracle.address,
+        token.address,
+        FEE,
+        await receipt.getTxHash()
+      );
+
+      // Submit the questions (in a single batch for optimisation)
+      await sendQuestionsBatch(QUESTION_NOTE_REQUESTER);
+    }, 120_000);
+
+    it("get_questions returns the correct questions to the requester", async () => {
+      // get the answers
+      const questions: QuestionNote[] = (
+        await oracle
+          .withWallet(requester)
+          .methods.get_questions_unconstrained(requester.getAddress())
+          .view({ from: requester.getAddress() })
+      ).map((x: QuestionNote) => new QuestionNote(x));
+
+      console.log(questions);
+
+      // Check: are all questions included in the array (will return 10 notes, 3 and 7 which are uninitialized)
+      // expect(answer).toEqual(expect.arrayContaining(QUESTION_NOTE_REQUESTER));
+
+      // Match on the 3 deterministic fields of each note (ie drop the random shared key nullifier)
+      type QuestionNoteWithoutRandom = Omit<
+        QuestionNote,
+        "shared_nullifier_key"
+      >;
+
+      expect(questions).toEqual(
+        expect.arrayContaining(
+          QUESTION_NOTE_REQUESTER.map((questionNote) => {
+            const noteWithoutNullifier: QuestionNoteWithoutRandom = {
+              is_some: questionNote.is_some,
+              request: questionNote.request,
+              requester: questionNote.requester,
+              divinity: questionNote.divinity,
+            };
+
+            return expect.objectContaining(noteWithoutNullifier);
+          })
+        )
+      );
+    });
+
+    it("get_questions returns the correct questions to the divinity", async () => {
+      // get the answers
+      const questions: QuestionNote[] = (
+        await oracle
+          .withWallet(divinity)
+          .methods.get_questions_unconstrained(requester.getAddress())
+          .view({ from: divinity.getAddress() })
+      ).map((x: QuestionNote) => new QuestionNote(x));
+
+      console.log(questions);
+
+      // Match on the 3 deterministic fields of each note (ie drop the random shared key nullifier)
+      type QuestionNoteWithoutRandom = Omit<
+        QuestionNote,
+        "shared_nullifier_key"
+      >;
+
+      expect(questions).toEqual(
+        expect.arrayContaining(
+          QUESTION_NOTE_REQUESTER.map((questionNote) => {
+            const noteWithoutNullifier: QuestionNoteWithoutRandom = {
+              is_some: questionNote.is_some,
+              request: questionNote.request,
+              requester: questionNote.requester,
+              divinity: questionNote.divinity,
+            };
+
+            return expect.objectContaining(noteWithoutNullifier);
+          })
+        )
+      );
+    });
+  });
+
   describe("unconstrained: get_answers_unconstrained(..)", () => {
+    let QUESTION_NOTE_DIVINITY: QuestionNote[];
+    let QUESTION_NOTE_REQUESTER: QuestionNote[];
     let ANSWER_NOTE_DIVINITY: AnswerNote[];
     let ANSWER_NOTE_REQUESTER: AnswerNote[];
 
     // Setup: Deploy the oracle and submit 3 questions
     beforeAll(async () => {
       // Create the answer notes we should get
-      ANSWER_NOTE_DIVINITY = createCorrectAnswerNotes(divinity);
-      ANSWER_NOTE_REQUESTER = createCorrectAnswerNotes(requester);
+      [QUESTION_NOTE_DIVINITY, ANSWER_NOTE_DIVINITY] =
+        createCorrectNotes(divinity);
+      [QUESTION_NOTE_REQUESTER, ANSWER_NOTE_REQUESTER] =
+        createCorrectNotes(requester);
 
       // Deploy the token
       token = await TokenContract.deploy(deployer, requester.getAddress())
@@ -569,7 +680,7 @@ describe("E2E Private Oracle", () => {
       ]);
 
       // Submit the questions (in a single batch for optimisation)
-      await sendQuestionsBatch(ANSWER_NOTE_REQUESTER, nonces);
+      await sendQuestionsBatch(QUESTION_NOTE_REQUESTER);
 
       // Submit the answers
       await sendAnswersBatch(ANSWER_NOTE_REQUESTER);
@@ -841,16 +952,34 @@ const mintTokenFor = async (
     .wait();
 };
 
-const sendQuestionsBatch = async (answerNotes: AnswerNote[], nonces: Fr[]) => {
+const sendQuestionsBatch = async (questionNotes: QuestionNote[]) => {
+  // Create 3 nonces for token transfer
+  const nonces: Fr[] = await Promise.all([
+    createAuthUnshieldMessage(token, requester, oracle.address, FEE),
+    createAuthUnshieldMessage(token, requester, oracle.address, FEE),
+    createAuthUnshieldMessage(token, requester, oracle.address, FEE),
+  ]);
   const batchQuestions = new BatchCall(requester, [
     oracle.methods
-      .submit_question(answerNotes[0].request, divinity.getAddress(), nonces[0])
+      .submit_question(
+        questionNotes[0].request,
+        divinity.getAddress(),
+        nonces[0]
+      )
       .request(),
     oracle.methods
-      .submit_question(answerNotes[1].request, divinity.getAddress(), nonces[1])
+      .submit_question(
+        questionNotes[1].request,
+        divinity.getAddress(),
+        nonces[1]
+      )
       .request(),
     oracle.methods
-      .submit_question(answerNotes[2].request, divinity.getAddress(), nonces[2])
+      .submit_question(
+        questionNotes[2].request,
+        divinity.getAddress(),
+        nonces[2]
+      )
       .request(),
   ]);
 
@@ -885,34 +1014,58 @@ const sendAnswersBatch = async (answerNotes: AnswerNote[]) => {
   await batchAnswers.send().wait();
 };
 
-
-const createCorrectAnswerNotes = (
+function createCorrectNotes(
   owner: AccountWalletWithPrivateKey
-): AnswerNote[] => {
+): [QuestionNote[], AnswerNote[]] {
   return [
-    {
-      is_some: true,
-      request: QUESTION,
-      answer: ANSWER,
-      requester: requester.getAddress(),
-      divinity: divinity.getAddress(),
-      owner: owner.getAddress(),
-    },
-    {
-      is_some: true,
-      request: QUESTION + 1n,
-      answer: ANSWER + 1n,
-      requester: requester.getAddress(),
-      divinity: divinity.getAddress(),
-      owner: owner.getAddress(),
-    },
-    {
-      is_some: true,
-      request: QUESTION + 2n,
-      answer: ANSWER + 2n,
-      requester: requester.getAddress(),
-      divinity: divinity.getAddress(),
-      owner: owner.getAddress(),
-    },
+    [
+      {
+        is_some: true,
+        request: QUESTION,
+        requester: requester.getAddress(),
+        divinity: divinity.getAddress(),
+        shared_nullifier_key: 0n, // Generated while submitting the question, in the contract
+      },
+      {
+        is_some: true,
+        request: QUESTION + 1n,
+        requester: requester.getAddress(),
+        divinity: divinity.getAddress(),
+        shared_nullifier_key: 0n,
+      },
+      {
+        is_some: true,
+        request: QUESTION + 2n,
+        requester: requester.getAddress(),
+        divinity: divinity.getAddress(),
+        shared_nullifier_key: 0n,
+      },
+    ],
+    [
+      {
+        is_some: true,
+        request: QUESTION,
+        answer: ANSWER,
+        requester: requester.getAddress(),
+        divinity: divinity.getAddress(),
+        owner: owner.getAddress(),
+      },
+      {
+        is_some: true,
+        request: QUESTION + 1n,
+        answer: ANSWER + 1n,
+        requester: requester.getAddress(),
+        divinity: divinity.getAddress(),
+        owner: owner.getAddress(),
+      },
+      {
+        is_some: true,
+        request: QUESTION + 2n,
+        answer: ANSWER + 2n,
+        requester: requester.getAddress(),
+        divinity: divinity.getAddress(),
+        owner: owner.getAddress(),
+      },
+    ],
   ];
 };

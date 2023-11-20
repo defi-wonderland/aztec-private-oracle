@@ -21,22 +21,25 @@ use dep::aztec::{
 /// @member requester_pk: the public key of the requester
 /// @member divinity_address: the address of the divinity
 /// @member shared_nullifier_key: the shared nullifier key (a random value existing in both the divinity and the requester set of notes)
+/// @member escrow_randomness: the randomness for the created escrow
 /// @member header: the note header
 struct QuestionNote {
     request: Field,
     requester_address: AztecAddress,
     divinity_address: AztecAddress,
     shared_nullifier_key: Field,
+    escrow_randomness: Field,
     header: NoteHeader
 }
 
-global QUESTION_NOTE_LEN: Field = 4;
+global QUESTION_NOTE_LEN: Field = 5;
 
 impl QuestionNote {
     pub fn new( _request: Field,
             _requesterAddress: AztecAddress,
             _divinityAddress: AztecAddress,
-            _sharedNullifierKey: Field
+            _sharedNullifierKey: Field,
+            _escrowRandomness: Field
         ) -> Self {
 
         QuestionNote {
@@ -44,13 +47,14 @@ impl QuestionNote {
             requester_address: _requesterAddress,
             divinity_address: _divinityAddress,
             shared_nullifier_key: _sharedNullifierKey,
+            escrow_randomness: _escrowRandomness,
             header: NoteHeader::empty(),
         }
 
     }
 
     fn serialize(self) -> [Field; QUESTION_NOTE_LEN] {
-        [self.request, self.requester_address.address, self.divinity_address.address, self.shared_nullifier_key]
+        [self.request, self.requester_address.address, self.divinity_address.address, self.shared_nullifier_key, self.escrow_randomness]
     }
 
     fn deserialize(preimage: [Field; QUESTION_NOTE_LEN]) -> Self {
@@ -59,6 +63,7 @@ impl QuestionNote {
             requester_address: AztecAddress::new(preimage[1]),
             divinity_address: AztecAddress::new(preimage[2]),
             shared_nullifier_key: preimage[3], 
+            escrow_randomness: preimage[4],
             header: NoteHeader::empty(),
         }
     }

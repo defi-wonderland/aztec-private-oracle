@@ -14,7 +14,8 @@ import {
   Note,
 } from "@aztec/aztec.js";
 
-import { TokenContract } from "@aztec/noir-contracts/types";
+import { TokenContract } from "../token/Token.js";
+
 import { PrivateOracleContract } from "../../types/PrivateOracle.js";
 
 const {
@@ -32,6 +33,8 @@ const ANSWER = 456n;
 const ALTERNATIVE_ANSWER = 789n;
 const FEE = 1000n;
 const MINT_AMOUNT = 10000n;
+
+const ADDRESS_ZERO = AztecAddress.fromBigInt(0n);
 
 let pxe: PXE;
 let oracle: PrivateOracleContract;
@@ -99,10 +102,11 @@ describe("E2E Private Oracle", () => {
 
     // Test: is the tx successful
     it("Tx to submit_question is mined and token are transfered", async () => {
-      const nonce = await createAuthUnshieldMessage(
+      const nonce = await createAuthEscrowMessage(
         token,
         requester,
         oracle.address,
+        [requester.getAddress(), divinity.getAddress(), ADDRESS_ZERO, ADDRESS_ZERO],
         FEE
       );
       // Submit the question
@@ -113,17 +117,13 @@ describe("E2E Private Oracle", () => {
         .wait();
 
       expect(receipt.status).toBe("mined");
-
-      let [requesterBalance, oracleBalance] = await Promise.all([
-        token
-          .withWallet(requester)
-          .methods.balance_of_private(requester.getAddress())
-          .view(),
-        token.methods.balance_of_public(oracle.address).view(),
-      ]);
+      
+      let requesterBalance = await token
+      .withWallet(requester)
+      .methods.balance_of_private(requester.getAddress())
+      .view();
 
       expect(requesterBalance).toEqual(MINT_AMOUNT - FEE);
-      expect(oracleBalance).toEqual(FEE);
     });
 
     // Test: is the note correctly stored in the private storage, for the divinity
@@ -180,10 +180,11 @@ describe("E2E Private Oracle", () => {
     // Test: creating a new question with the same parameters (from a different requester) is possible
     //       and will have a different nullifier shared key
     it("another requester can ask the same question and will get a different nullifier shared key", async () => {
-      const nonce = await createAuthUnshieldMessage(
+      const nonce = await createAuthEscrowMessage(
         token,
         requester2,
         oracle.address,
+        [requester2.getAddress(), divinity.getAddress(), ADDRESS_ZERO, ADDRESS_ZERO],
         FEE
       );
 
@@ -213,6 +214,16 @@ describe("E2E Private Oracle", () => {
           }),
         ]
       );
+
+      // Console.log divinityRequestsNotes
+      console.log(divinityRequestsNotes.map(n => n.note.items.map(i => i.value.toString())));
+      const escrowNotes = await pxe.getNotes({
+        owner: requester.getAddress(),
+        contractAddress: token.address,
+        storageSlot: new Fr(7),
+      });
+      console.log(escrowNotes.map(n => n.note.items.map(i => i.value.toString())));
+
 
       // Check: Compare the note's data with the expected values (this is the second note for the divnity)
       expect(divinityRequestsNotes[1].note.items[0].value).toEqual(QUESTION);
@@ -271,10 +282,11 @@ describe("E2E Private Oracle", () => {
         await receipt.getTxHash()
       );
 
-      const nonce = await createAuthUnshieldMessage(
+      const nonce = await createAuthEscrowMessage(
         token,
         requester,
         oracle.address,
+        [requester.getAddress(), divinity.getAddress(), ADDRESS_ZERO, ADDRESS_ZERO],
         FEE
       );
 
@@ -297,13 +309,9 @@ describe("E2E Private Oracle", () => {
 
       expect(receipt.status).toBe("mined");
 
-      let [divinityBalance, oracleBalance] = await Promise.all([
-        token.methods.balance_of_public(divinity.getAddress()).view(),
-        token.methods.balance_of_public(oracle.address).view(),
-      ]);
+      let divinityBalance = await token.withWallet(divinity).methods.balance_of_private(divinity.getAddress()).view();
 
       expect(divinityBalance).toEqual(FEE);
-      expect(oracleBalance).toEqual(0n);
     });
 
     // Test: is the answer note stored correct, for the divinity
@@ -383,10 +391,11 @@ describe("E2E Private Oracle", () => {
     // Test: if a second request is made from a different requester, asking the same question, is the divinity
     //       forced to answer with the same answer (answer consistency)?
     it("second identical question cannot have a different answer (from the same divinity)", async () => {
-      const nonce = await createAuthUnshieldMessage(
+      const nonce = await createAuthEscrowMessage(
         token,
         requester2,
         oracle.address,
+        [requester2.getAddress(), divinity.getAddress(), ADDRESS_ZERO, ADDRESS_ZERO],
         FEE
       );
 
@@ -450,10 +459,11 @@ describe("E2E Private Oracle", () => {
         await receipt.getTxHash()
       );
 
-      const nonce = await createAuthUnshieldMessage(
+      const nonce = await createAuthEscrowMessage(
         token,
         requester,
         oracle.address,
+        [requester.getAddress(), divinity.getAddress(), ADDRESS_ZERO, ADDRESS_ZERO],
         FEE
       );
 
@@ -475,26 +485,14 @@ describe("E2E Private Oracle", () => {
 
       expect(receipt.status).toBe("mined");
 
-      let [requesterBalance, requesterBalanceUnshielded, oracleBalance] =
-        await Promise.all([
-          token
-            .withWallet(requester)
-            .methods.balance_of_private(requester.getAddress())
-            .view(),
+      let requesterBalance = await token
+      .withWallet(requester)
+      .methods.balance_of_private(requester.getAddress())
+      .view();
 
-          // Refunded portion is unshielded
-          token.methods.balance_of_public(requester.getAddress()).view(),
-
-          token
-            .withWallet(requester)
-            .methods.balance_of_public(oracle.address)
-            .view(),
-        ]);
-
-      expect(requesterBalance + requesterBalanceUnshielded).toEqual(
+      expect(requesterBalance).toEqual(
         MINT_AMOUNT
       );
-      expect(oracleBalance).toEqual(0n);
     });
 
     // Test: is the request note of the requester now nullified
@@ -551,10 +549,11 @@ describe("E2E Private Oracle", () => {
         await receipt.getTxHash()
       );
 
-      const nonce = await createAuthUnshieldMessage(
+      const nonce = await createAuthEscrowMessage(
         token,
         requester,
         oracle.address,
+        [requester.getAddress(), divinity.getAddress(), ADDRESS_ZERO, ADDRESS_ZERO],
         FEE
       );
 
@@ -668,17 +667,20 @@ describe("E2E Private Oracle", () => {
   });
 });
 
-const createAuthUnshieldMessage = async (
+const createAuthEscrowMessage = async (
   token: TokenContract,
   from: AccountWalletWithPrivateKey,
-  to: AztecAddress,
+  agent: AztecAddress,
+  participants: AztecAddress[],
   amount: any
 ) => {
   const nonce = Fr.random();
-
+  console.log(agent.toString());
+  console.log(participants.map((p) => p.toString()));
+  //0x1505e68a1341be919a0d585e11f7c0261dfe607a78ba54f979dc84f9f1ab424d
   // We need to compute the message we want to sign and add it to the wallet as approved
-  const action = token.methods.unshield(from.getAddress(), to, amount, nonce);
-  const messageHash = await computeAuthWitMessageHash(to, action.request());
+  const action = token.methods.escrow(from.getAddress(), agent, amount, participants, nonce);
+  const messageHash = await computeAuthWitMessageHash(agent, action.request());
 
   // Both wallets are connected to same node and PXE so we could just insert directly using
   // await wallet.signAndAddAuthWitness(messageHash, );

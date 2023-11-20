@@ -573,11 +573,7 @@ describe("E2E Private Oracle", () => {
           .view({ from: requester.getAddress() })
       ).map((x: QuestionNote) => new QuestionNote(x));
 
-      console.log(questions);
-
       // Check: are all questions included in the array (will return 10 notes, 3 and 7 which are uninitialized)
-      // expect(answer).toEqual(expect.arrayContaining(QUESTION_NOTE_REQUESTER));
-
       // Match on the 3 deterministic fields of each note (ie drop the random shared key nullifier)
       type QuestionNoteWithoutRandom = Omit<
         QuestionNote,
@@ -609,8 +605,110 @@ describe("E2E Private Oracle", () => {
           .view({ from: divinity.getAddress() })
       ).map((x: QuestionNote) => new QuestionNote(x));
 
-      console.log(questions);
+      // Check: are all questions included in the array (will return 10 notes, 3 and 7 which are uninitialized)
+      // Match on the 3 deterministic fields of each note (ie drop the random shared key nullifier)
+      type QuestionNoteWithoutRandom = Omit<
+        QuestionNote,
+        "shared_nullifier_key"
+      >;
 
+      expect(questions).toEqual(
+        expect.arrayContaining(
+          QUESTION_NOTE_REQUESTER.map((questionNote) => {
+            const noteWithoutNullifier: QuestionNoteWithoutRandom = {
+              is_some: questionNote.is_some,
+              request: questionNote.request,
+              requester: questionNote.requester,
+              divinity: questionNote.divinity,
+            };
+
+            return expect.objectContaining(noteWithoutNullifier);
+          })
+        )
+      );
+    });
+  });
+
+  // get_pending_questions_unconstrained
+  describe("unconstrained: get_questions_unconstrained(..)", () => {
+    let QUESTION_NOTE_DIVINITY: QuestionNote[];
+    let QUESTION_NOTE_REQUESTER: QuestionNote[];
+
+    // Setup: Deploy the oracle and submit 3 questions
+    beforeAll(async () => {
+      [QUESTION_NOTE_DIVINITY] = createCorrectNotes(divinity);
+      [QUESTION_NOTE_REQUESTER] = createCorrectNotes(requester);
+
+      // Deploy the token
+      token = await TokenContract.deploy(deployer, requester.getAddress())
+        .send()
+        .deployed();
+
+      // Mint tokens for the requester
+      await mintTokenFor(requester, requester, MINT_AMOUNT);
+
+      // Deploy the oracle
+      const receipt = PrivateOracleContract.deploy(
+        deployer,
+        token.address,
+        FEE
+      ).send();
+      oracle = await receipt.deployed();
+
+      await addTokenAndFeeNotesToPXE(
+        requester.getAddress(),
+        oracle.address,
+        token.address,
+        FEE,
+        await receipt.getTxHash()
+      );
+
+      // Submit the questions (in a single batch for optimisation)
+      await sendQuestionsBatch(QUESTION_NOTE_REQUESTER);
+    }, 120_000);
+
+    it("get_questions_unconstrained returns the correct questions to the requester", async () => {
+      // get the answers
+      const questions: QuestionNote[] = (
+        await oracle
+          .withWallet(requester)
+          .methods.get_pending_questions_unconstrained(divinity.getAddress())
+          .view({ from: requester.getAddress() })
+      ).map((x: QuestionNote) => new QuestionNote(x));
+
+      // Check: are all questions included in the array (will return 10 notes, 3 and 7 which are uninitialized)
+      // Match on the 3 deterministic fields of each note (ie drop the random shared key nullifier)
+      type QuestionNoteWithoutRandom = Omit<
+        QuestionNote,
+        "shared_nullifier_key"
+      >;
+
+      expect(questions).toEqual(
+        expect.arrayContaining(
+          QUESTION_NOTE_REQUESTER.map((questionNote) => {
+            const noteWithoutNullifier: QuestionNoteWithoutRandom = {
+              is_some: questionNote.is_some,
+              request: questionNote.request,
+              requester: questionNote.requester,
+              divinity: questionNote.divinity,
+            };
+
+            return expect.objectContaining(noteWithoutNullifier);
+          })
+        )
+      );
+    });
+
+    it("get_questions_unconstrained returns the correct questions to the divinity", async () => {
+      // get the answers
+      const questions: QuestionNote[] = (
+        await oracle
+          .withWallet(divinity)
+          .methods.get_pending_questions_unconstrained(divinity.getAddress())
+          .view({ from: divinity.getAddress() })
+      ).map((x: QuestionNote) => new QuestionNote(x));
+
+      // Check: are all questions included in the array (will return 10 notes, 3 and 7 which are uninitialized)
       // Match on the 3 deterministic fields of each note (ie drop the random shared key nullifier)
       type QuestionNoteWithoutRandom = Omit<
         QuestionNote,
@@ -671,13 +769,6 @@ describe("E2E Private Oracle", () => {
         FEE,
         await receipt.getTxHash()
       );
-
-      // Create 3 nonces for token transfer
-      const nonces: Fr[] = await Promise.all([
-        createAuthUnshieldMessage(token, requester, oracle.address, FEE),
-        createAuthUnshieldMessage(token, requester, oracle.address, FEE),
-        createAuthUnshieldMessage(token, requester, oracle.address, FEE),
-      ]);
 
       // Submit the questions (in a single batch for optimisation)
       await sendQuestionsBatch(QUESTION_NOTE_REQUESTER);

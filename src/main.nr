@@ -308,18 +308,7 @@ contract PrivateOracle {
         );
     }
 
-    unconstrained fn get_answers_unconstrained(owner: AztecAddress) -> [Option<AnswerNote>; 10] {
-        // MAX_NOTES_PER_PAGE == 10
-        // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
-
-        //TODO: paginate
-        // create the filter
-        let answer_getter_option = NoteViewerOptions::new().select(4, owner.address);
-
-        // filter the notes and return the answer-
-        storage.answers.view_notes(answer_getter_option)
-    }        
-
+    // Return all questions from a given requester that the caller can decrypt (max 10 for now)
     unconstrained fn get_questions_unconstrained(requester: AztecAddress) -> [Option<QuestionNote>; 10] {
         // MAX_NOTES_PER_PAGE == 10
         // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
@@ -345,13 +334,26 @@ contract PrivateOracle {
         storage.questions.view_notes(question_getter_option)
     }
 
+    // Returns the questions answered owned by a given address
+    unconstrained fn get_answers_unconstrained(owner: AztecAddress) -> [Option<AnswerNote>; 10] {
+        // MAX_NOTES_PER_PAGE == 10
+        // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
+
+        //TODO: paginate
+        // create the filter
+        let answer_getter_option = NoteViewerOptions::new().select(4, owner.address);
+
+        // filter the notes and return the answer-
+        storage.answers.view_notes(answer_getter_option)
+    }   
+
     // Get the answer to a question - unconstrained. Returns all answers to the same questions, from all the divinities
     // Obviously, only the question from the sender can be read
     unconstrained fn get_answer_unconstrained(question: Field, note_owner: AztecAddress) -> AnswerNote {
-    // MAX_NOTES_PER_PAGE == 10
-    // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
+        // MAX_NOTES_PER_PAGE == 10
+        // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
 
-    //TODO: paginate
+        //TODO: paginate
         // create the filter
         let answer_getter_option = NoteViewerOptions::new().select(0, question).select(4, note_owner.address).set_limit(1);
 

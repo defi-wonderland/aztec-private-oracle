@@ -675,9 +675,7 @@ const createAuthEscrowMessage = async (
   amount: any
 ) => {
   const nonce = Fr.random();
-  console.log(agent.toString());
-  console.log(participants.map((p) => p.toString()));
-  //0x1505e68a1341be919a0d585e11f7c0261dfe607a78ba54f979dc84f9f1ab424d
+  
   // We need to compute the message we want to sign and add it to the wallet as approved
   const action = token.methods.escrow(from.getAddress(), agent, amount, participants, nonce);
   const messageHash = await computeAuthWitMessageHash(agent, action.request());

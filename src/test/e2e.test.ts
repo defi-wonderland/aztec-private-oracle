@@ -722,9 +722,15 @@ const createAuthEscrowMessage = async (
   amount: any
 ) => {
   const nonce = Fr.random();
-  
+
   // We need to compute the message we want to sign and add it to the wallet as approved
-  const action = token.methods.escrow(from.getAddress(), agent, amount, participants, nonce);
+  const action = token.methods.escrow(
+    from.getAddress(),
+    agent,
+    amount,
+    participants,
+    nonce
+  );
   const messageHash = await computeAuthWitMessageHash(agent, action.request());
 
   // Both wallets are connected to same node and PXE so we could just insert directly using

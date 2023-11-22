@@ -83,6 +83,9 @@ describe("E2E Private Oracle", () => {
         .wait();
       oracle = receipt.contract;
 
+      // Add the contract public key to the PXE
+      await pxe.registerRecipient(oracle.completeAddress);
+
       await addTokenAndFeeNotesToPXE(
         requester.getAddress(),
         oracle.address,
@@ -106,7 +109,12 @@ describe("E2E Private Oracle", () => {
         token,
         requester,
         oracle.address,
-        [requester.getAddress(), divinity.getAddress(), ADDRESS_ZERO, ADDRESS_ZERO],
+        [
+          requester.getAddress(),
+          divinity.getAddress(),
+          ADDRESS_ZERO,
+          ADDRESS_ZERO,
+        ],
         FEE
       );
       // Submit the question
@@ -117,11 +125,11 @@ describe("E2E Private Oracle", () => {
         .wait();
 
       expect(receipt.status).toBe("mined");
-      
+
       let requesterBalance = await token
-      .withWallet(requester)
-      .methods.balance_of_private(requester.getAddress())
-      .view();
+        .withWallet(requester)
+        .methods.balance_of_private(requester.getAddress())
+        .view();
 
       expect(requesterBalance).toEqual(MINT_AMOUNT - FEE);
     });
@@ -184,7 +192,12 @@ describe("E2E Private Oracle", () => {
         token,
         requester2,
         oracle.address,
-        [requester2.getAddress(), divinity.getAddress(), ADDRESS_ZERO, ADDRESS_ZERO],
+        [
+          requester2.getAddress(),
+          divinity.getAddress(),
+          ADDRESS_ZERO,
+          ADDRESS_ZERO,
+        ],
         FEE
       );
 
@@ -216,14 +229,19 @@ describe("E2E Private Oracle", () => {
       );
 
       // Console.log divinityRequestsNotes
-      console.log(divinityRequestsNotes.map(n => n.note.items.map(i => i.value.toString())));
+      console.log(
+        divinityRequestsNotes.map((n) =>
+          n.note.items.map((i) => i.value.toString())
+        )
+      );
       const escrowNotes = await pxe.getNotes({
         owner: requester.getAddress(),
         contractAddress: token.address,
         storageSlot: new Fr(7),
       });
-      console.log(escrowNotes.map(n => n.note.items.map(i => i.value.toString())));
-
+      console.log(
+        escrowNotes.map((n) => n.note.items.map((i) => i.value.toString()))
+      );
 
       // Check: Compare the note's data with the expected values (this is the second note for the divnity)
       expect(divinityRequestsNotes[1].note.items[0].value).toEqual(QUESTION);
@@ -274,6 +292,8 @@ describe("E2E Private Oracle", () => {
 
       oracle = await receipt.deployed();
 
+      await pxe.registerRecipient(oracle.completeAddress);
+
       await addTokenAndFeeNotesToPXE(
         requester.getAddress(),
         oracle.address,
@@ -286,7 +306,12 @@ describe("E2E Private Oracle", () => {
         token,
         requester,
         oracle.address,
-        [requester.getAddress(), divinity.getAddress(), ADDRESS_ZERO, ADDRESS_ZERO],
+        [
+          requester.getAddress(),
+          divinity.getAddress(),
+          ADDRESS_ZERO,
+          ADDRESS_ZERO,
+        ],
         FEE
       );
 
@@ -309,7 +334,10 @@ describe("E2E Private Oracle", () => {
 
       expect(receipt.status).toBe("mined");
 
-      let divinityBalance = await token.withWallet(divinity).methods.balance_of_private(divinity.getAddress()).view();
+      let divinityBalance = await token
+        .withWallet(divinity)
+        .methods.balance_of_private(divinity.getAddress())
+        .view();
 
       expect(divinityBalance).toEqual(FEE);
     });
@@ -395,7 +423,12 @@ describe("E2E Private Oracle", () => {
         token,
         requester2,
         oracle.address,
-        [requester2.getAddress(), divinity.getAddress(), ADDRESS_ZERO, ADDRESS_ZERO],
+        [
+          requester2.getAddress(),
+          divinity.getAddress(),
+          ADDRESS_ZERO,
+          ADDRESS_ZERO,
+        ],
         FEE
       );
 
@@ -459,11 +492,18 @@ describe("E2E Private Oracle", () => {
         await receipt.getTxHash()
       );
 
+      await pxe.registerRecipient(oracle.completeAddress);
+
       const nonce = await createAuthEscrowMessage(
         token,
         requester,
         oracle.address,
-        [requester.getAddress(), divinity.getAddress(), ADDRESS_ZERO, ADDRESS_ZERO],
+        [
+          requester.getAddress(),
+          divinity.getAddress(),
+          ADDRESS_ZERO,
+          ADDRESS_ZERO,
+        ],
         FEE
       );
 
@@ -486,13 +526,11 @@ describe("E2E Private Oracle", () => {
       expect(receipt.status).toBe("mined");
 
       let requesterBalance = await token
-      .withWallet(requester)
-      .methods.balance_of_private(requester.getAddress())
-      .view();
+        .withWallet(requester)
+        .methods.balance_of_private(requester.getAddress())
+        .view();
 
-      expect(requesterBalance).toEqual(
-        MINT_AMOUNT
-      );
+      expect(requesterBalance).toEqual(MINT_AMOUNT);
     });
 
     // Test: is the request note of the requester now nullified
@@ -541,6 +579,8 @@ describe("E2E Private Oracle", () => {
       ).send();
       oracle = await receipt.deployed();
 
+      await pxe.registerRecipient(oracle.completeAddress);
+
       await addTokenAndFeeNotesToPXE(
         requester.getAddress(),
         oracle.address,
@@ -553,7 +593,12 @@ describe("E2E Private Oracle", () => {
         token,
         requester,
         oracle.address,
-        [requester.getAddress(), divinity.getAddress(), ADDRESS_ZERO, ADDRESS_ZERO],
+        [
+          requester.getAddress(),
+          divinity.getAddress(),
+          ADDRESS_ZERO,
+          ADDRESS_ZERO,
+        ],
         FEE
       );
 
@@ -637,6 +682,8 @@ describe("E2E Private Oracle", () => {
         .send()
         .wait();
       oracle = receipt.contract;
+
+      await pxe.registerRecipient(oracle.completeAddress);
     }, 30_000);
 
     it("returns the correct fee", async () => {

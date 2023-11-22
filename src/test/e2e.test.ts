@@ -629,7 +629,6 @@ describe("E2E Private Oracle", () => {
     });
   });
 
-  // get_pending_questions_unconstrained
   describe("unconstrained: get_questions_unconstrained(..)", () => {
     let QUESTION_NOTE_DIVINITY: QuestionNote[];
     let QUESTION_NOTE_REQUESTER: QuestionNote[];

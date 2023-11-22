@@ -184,8 +184,8 @@ contract PrivateOracle {
             question,
             sender, 
             divinity_address,
-            escrow_randomness,
-            random_nullifier_shared_key
+            random_nullifier_shared_key,
+            escrow_randomness
         );
 
         // Commit the note in the data tree and send to requester

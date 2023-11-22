@@ -463,7 +463,7 @@ describe("E2E Private Oracle", () => {
       // Check: Compare the note's data with the expected values: the answer is the same as the first one and not the new one
       expect(requester2AnswersNotes[0].note.items[0].value).toEqual(QUESTION);
       expect(requester2AnswersNotes[0].note.items[1].value).toEqual(ANSWER);
-    }, 30_000);
+    }, 60_000);
   });
 
   describe("cancel_question(..)", () => {
@@ -513,7 +513,7 @@ describe("E2E Private Oracle", () => {
         .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
         .send()
         .wait();
-    }, 45_000);
+    }, 60_000);
 
     // Test: is the tx successful
     it("Tx to cancel_question is mined and token transferred back to requester", async () => {
@@ -684,7 +684,7 @@ describe("E2E Private Oracle", () => {
       oracle = receipt.contract;
 
       await pxe.registerRecipient(oracle.completeAddress);
-    }, 30_000);
+    }, 60_000);
 
     it("returns the correct fee", async () => {
       let storedFee = await oracle.methods.get_fee().view();

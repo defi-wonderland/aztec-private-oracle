@@ -60,11 +60,17 @@ beforeAll(async () => {
 describe("E2E Private Oracle", () => {
   describe("submit_question(..)", () => {
     // global scoped to assert accross 'it' blocks
-    let shared_key_nullifier_divinity: Fr;
-    let shared_key_nullifier_requester: Fr;
+    let shared_key_nullifier_divinity: bigint;
+    let shared_key_nullifier_requester: bigint;
+
+    // create the question notes for the requester and divinity
+    let QUESTION_NOTE: QuestionNote;
 
     // Setup: Deploy the oracle
     beforeAll(async () => {
+      // Create the question notes we should get
+      QUESTION_NOTE = createCorrectNotes(requester)[0][0];
+
       // Deploy the token
       token = await TokenContract.deploy(deployer, requester.getAddress())
         .send()
@@ -111,7 +117,11 @@ describe("E2E Private Oracle", () => {
       // Submit the question
       const receipt = await oracle
         .withWallet(requester)
-        .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
+        .methods.submit_question(
+          QUESTION_NOTE.request,
+          divinity.getAddress(),
+          nonce
+        )
         .send()
         .wait();
 
@@ -131,46 +141,64 @@ describe("E2E Private Oracle", () => {
 
     // Test: is the note correctly stored in the private storage, for the divinity
     it("divinity question note has the correct data", async () => {
-      // Get the private storage for the divinity's question slot
-      const divinityRequestsNotes = await pxe.getNotes({
-        owner: divinity.getAddress(),
-        contractAddress: oracle.address,
-        storageSlot: QUESTIONS_SLOT,
-      });
+      const question: QuestionNote = new QuestionNote(
+        (
+          await oracle
+            .withWallet(divinity)
+            .methods.get_pending_questions_unconstrained(divinity.getAddress())
+            .view({ from: divinity.getAddress() })
+        )[0]
+      ); // returns 10 by default
+
+      console.log(question);
 
       // Check: Compare the note's data with the expected values
-      expect(divinityRequestsNotes[0].note.items[0].value).toEqual(QUESTION);
-      expect(
-        AztecAddress.fromField(divinityRequestsNotes[0].note.items[1])
-      ).toEqual(requester.getAddress());
-      expect(
-        AztecAddress.fromField(divinityRequestsNotes[0].note.items[2])
-      ).toEqual(divinity.getAddress());
+      type QuestionNoteWithoutRandom = Omit<
+        QuestionNote,
+        "shared_nullifier_key"
+      >;
+
+      const questionNoteWithoutRandom: QuestionNoteWithoutRandom = {
+        request: QUESTION_NOTE.request,
+        requester: QUESTION_NOTE.requester,
+        divinity: QUESTION_NOTE.divinity,
+      };
+
+      expect(question).toEqual(
+        expect.objectContaining(questionNoteWithoutRandom)
+      );
 
       // Store the random nullifier shared key, for later comparison
-      shared_key_nullifier_divinity = divinityRequestsNotes[0].note.items[3];
+      shared_key_nullifier_divinity = question.shared_nullifier_key;
     });
 
     // Test: is the note correctly stored in the private storage, for the requester
     it("requester question note has the correct data", async () => {
-      // Get the private storage for the requester's question slot
-      const requesterRequestsNotes = await pxe.getNotes({
-        owner: requester.getAddress(),
-        contractAddress: oracle.address,
-        storageSlot: QUESTIONS_SLOT,
-      });
+      const question: QuestionNote = (
+        await oracle
+          .withWallet(requester)
+          .methods.get_pending_questions_unconstrained(divinity.getAddress())
+          .view({ from: requester.getAddress() })
+      ).map((x: QuestionNote) => new QuestionNote(x))[0]; // returns 10 by default
 
-      // Compare the note's data with the expected values
-      expect(requesterRequestsNotes[0].note.items[0].value).toEqual(QUESTION);
-      expect(
-        AztecAddress.fromField(requesterRequestsNotes[0].note.items[1])
-      ).toEqual(requester.getAddress());
-      expect(
-        AztecAddress.fromField(requesterRequestsNotes[0].note.items[2])
-      ).toEqual(divinity.getAddress());
+      // Check: Compare the note's data with the expected values
+      type QuestionNoteWithoutRandom = Omit<
+        QuestionNote,
+        "shared_nullifier_key"
+      >;
+
+      const questionNoteWithoutRandom: QuestionNoteWithoutRandom = {
+        request: QUESTION_NOTE.request,
+        requester: QUESTION_NOTE.requester,
+        divinity: QUESTION_NOTE.divinity,
+      };
+
+      expect(question).toEqual(
+        expect.objectContaining(questionNoteWithoutRandom)
+      );
 
       // Store the random nullifier shared key, for later comparison
-      shared_key_nullifier_requester = requesterRequestsNotes[0].note.items[3];
+      shared_key_nullifier_requester = question.shared_nullifier_key;
     });
 
     // Test: is the nullifier shared key the same for the divinity and the requester
@@ -528,12 +556,10 @@ describe("E2E Private Oracle", () => {
   });
 
   describe("unconstrained: get_questions_unconstrained(..)", () => {
-    let QUESTION_NOTE_DIVINITY: QuestionNote[];
     let QUESTION_NOTE_REQUESTER: QuestionNote[];
 
     // Setup: Deploy the oracle and submit 3 questions
     beforeAll(async () => {
-      [QUESTION_NOTE_DIVINITY] = createCorrectNotes(divinity);
       [QUESTION_NOTE_REQUESTER] = createCorrectNotes(requester);
 
       // Deploy the token
@@ -584,7 +610,6 @@ describe("E2E Private Oracle", () => {
         expect.arrayContaining(
           QUESTION_NOTE_REQUESTER.map((questionNote) => {
             const noteWithoutNullifier: QuestionNoteWithoutRandom = {
-              is_some: questionNote.is_some,
               request: questionNote.request,
               requester: questionNote.requester,
               divinity: questionNote.divinity,
@@ -616,7 +641,6 @@ describe("E2E Private Oracle", () => {
         expect.arrayContaining(
           QUESTION_NOTE_REQUESTER.map((questionNote) => {
             const noteWithoutNullifier: QuestionNoteWithoutRandom = {
-              is_some: questionNote.is_some,
               request: questionNote.request,
               requester: questionNote.requester,
               divinity: questionNote.divinity,
@@ -629,13 +653,11 @@ describe("E2E Private Oracle", () => {
     });
   });
 
-  describe("unconstrained: get_questions_unconstrained(..)", () => {
-    let QUESTION_NOTE_DIVINITY: QuestionNote[];
+  describe("unconstrained: get_pending_questions_unconstrained(..)", () => {
     let QUESTION_NOTE_REQUESTER: QuestionNote[];
 
     // Setup: Deploy the oracle and submit 3 questions
     beforeAll(async () => {
-      [QUESTION_NOTE_DIVINITY] = createCorrectNotes(divinity);
       [QUESTION_NOTE_REQUESTER] = createCorrectNotes(requester);
 
       // Deploy the token
@@ -666,7 +688,7 @@ describe("E2E Private Oracle", () => {
       await sendQuestionsBatch(QUESTION_NOTE_REQUESTER);
     }, 120_000);
 
-    it("get_questions_unconstrained returns the correct questions to the requester", async () => {
+    it("get_pending_questions_unconstrained returns the correct questions to the requester", async () => {
       // get the answers
       const questions: QuestionNote[] = (
         await oracle
@@ -686,7 +708,6 @@ describe("E2E Private Oracle", () => {
         expect.arrayContaining(
           QUESTION_NOTE_REQUESTER.map((questionNote) => {
             const noteWithoutNullifier: QuestionNoteWithoutRandom = {
-              is_some: questionNote.is_some,
               request: questionNote.request,
               requester: questionNote.requester,
               divinity: questionNote.divinity,
@@ -698,7 +719,7 @@ describe("E2E Private Oracle", () => {
       );
     });
 
-    it("get_questions_unconstrained returns the correct questions to the divinity", async () => {
+    it("get_pending_questions_unconstrained returns the correct questions to the divinity", async () => {
       // get the answers
       const questions: QuestionNote[] = (
         await oracle
@@ -718,7 +739,6 @@ describe("E2E Private Oracle", () => {
         expect.arrayContaining(
           QUESTION_NOTE_REQUESTER.map((questionNote) => {
             const noteWithoutNullifier: QuestionNoteWithoutRandom = {
-              is_some: questionNote.is_some,
               request: questionNote.request,
               requester: questionNote.requester,
               divinity: questionNote.divinity,
@@ -804,8 +824,17 @@ describe("E2E Private Oracle", () => {
   });
 
   describe("unconstrained: get_answer_unconstrained(..)", () => {
+    let QUESTION_NOTE_REQUESTER: QuestionNote[];
+    let ANSWER_NOTE_REQUESTER: AnswerNote[];
+    let ANSWER_NOTE_DIVINITY: AnswerNote[];
+
     // Setup: Deploy the oracle and submit a question
     beforeAll(async () => {
+      // Create the answer notes we should get
+      [QUESTION_NOTE_REQUESTER, ANSWER_NOTE_REQUESTER] =
+        createCorrectNotes(requester);
+      [, ANSWER_NOTE_DIVINITY] = createCorrectNotes(divinity);
+
       // Deploy the token
       token = await TokenContract.deploy(deployer, requester.getAddress())
         .send()
@@ -830,70 +859,40 @@ describe("E2E Private Oracle", () => {
         await receipt.getTxHash()
       );
 
-      const nonce = await createAuthUnshieldMessage(
-        token,
-        requester,
-        oracle.address,
-        FEE
-      );
+      // Submit multiple questions (in a single batch for optimisation)
+      await sendQuestionsBatch(QUESTION_NOTE_REQUESTER);
 
-      // Submit a question
-      await oracle
-        .withWallet(requester)
-        .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
-        .send()
-        .wait();
-
-      // Submit an answer
-      await oracle
-        .withWallet(divinity)
-        .methods.submit_answer(QUESTION, requester.getAddress(), ANSWER)
-        .send()
-        .wait();
+      // Submit multiple answers (in a single batch for optimisation)
+      await sendAnswersBatch(ANSWER_NOTE_REQUESTER);
     }, 60_000);
 
     it("get_answer returns the correct answer to the requester", async () => {
       // Get the answer
       // Using "from" authentification (follow https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/pxe/src/pxe_service/pxe_service.ts#L337)
-      const answer = await oracle
-        .withWallet(requester)
-        .methods.get_answer_unconstrained(QUESTION, requester.getAddress())
-        .view({ from: requester.getAddress() });
+      const answer: AnswerNote = new AnswerNote(
+        await oracle
+          .withWallet(requester)
+          .methods.get_answer_unconstrained(
+            QUESTION_NOTE_REQUESTER[0].request,
+            requester.getAddress()
+          )
+          .view({ from: requester.getAddress() })
+      );
 
       // Check: Compare the answer with the expected value
-      expect(answer.request).toEqual(QUESTION);
-      expect(answer.answer).toEqual(ANSWER);
-      expect(AztecAddress.fromBigInt(answer.requester.address)).toEqual(
-        requester.getAddress()
-      );
-      expect(AztecAddress.fromBigInt(answer.divinity.address)).toEqual(
-        divinity.getAddress()
-      );
-      expect(AztecAddress.fromBigInt(answer.owner.address)).toEqual(
-        requester.getAddress()
-      );
+      expect(answer).toEqual(ANSWER_NOTE_REQUESTER[0]);
     });
 
     it("get_answer returns the correct answer to the divinity", async () => {
       // Get the answer
       // Using "from" authentification (follow https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/pxe/src/pxe_service/pxe_service.ts#L337)
-      const answer = await oracle
+      const answer: AnswerNote = await oracle
         .withWallet(divinity)
         .methods.get_answer_unconstrained(QUESTION, divinity.getAddress())
         .view({ from: divinity.getAddress() });
 
       // Check: Compare the answer with the expected value
-      expect(answer.request).toEqual(QUESTION);
-      expect(answer.answer).toEqual(ANSWER);
-      expect(AztecAddress.fromBigInt(answer.requester.address)).toEqual(
-        requester.getAddress()
-      );
-      expect(AztecAddress.fromBigInt(answer.divinity.address)).toEqual(
-        divinity.getAddress()
-      );
-      expect(AztecAddress.fromBigInt(answer.owner.address)).toEqual(
-        divinity.getAddress()
-      );
+      expect(answer).toEqual(expect.objectContaining(ANSWER_NOTE_DIVINITY[0]));
     });
   });
 
@@ -1110,21 +1109,18 @@ function createCorrectNotes(
   return [
     [
       {
-        is_some: true,
         request: QUESTION,
         requester: requester.getAddress(),
         divinity: divinity.getAddress(),
         shared_nullifier_key: 0n, // Generated while submitting the question, in the contract
       },
       {
-        is_some: true,
         request: QUESTION + 1n,
         requester: requester.getAddress(),
         divinity: divinity.getAddress(),
         shared_nullifier_key: 0n,
       },
       {
-        is_some: true,
         request: QUESTION + 2n,
         requester: requester.getAddress(),
         divinity: divinity.getAddress(),
@@ -1133,7 +1129,6 @@ function createCorrectNotes(
     ],
     [
       {
-        is_some: true,
         request: QUESTION,
         answer: ANSWER,
         requester: requester.getAddress(),
@@ -1141,7 +1136,6 @@ function createCorrectNotes(
         owner: owner.getAddress(),
       },
       {
-        is_some: true,
         request: QUESTION + 1n,
         answer: ANSWER + 1n,
         requester: requester.getAddress(),
@@ -1149,7 +1143,6 @@ function createCorrectNotes(
         owner: owner.getAddress(),
       },
       {
-        is_some: true,
         request: QUESTION + 2n,
         answer: ANSWER + 2n,
         requester: requester.getAddress(),

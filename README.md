@@ -4,6 +4,8 @@ Aztec private oracle provides an oracle solution for those who want to keep thei
 
 You can check our design for the proof of concept on [Figma](https://www.figma.com/file/vf16Wx0M1ma995WEjcsx8s/Aztec-Private-Oracle?type=whiteboard&node-id=1-2&t=KjgSLbNpUGqQmsi4-4)
 
+![Design](design.png?raw=true)
+
 ## Why would anyone want a private oracle?
 
 > *and what does “private” really mean…*

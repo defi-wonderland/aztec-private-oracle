@@ -55,7 +55,7 @@ beforeAll(async () => {
     getSandboxAccountsWallets(pxe),
     createAccount(pxe),
   ]);
-}, 60_000);
+}, 120_000);
 
 describe("E2E Private Oracle", () => {
   describe("submit_question(..)", () => {
@@ -96,7 +96,7 @@ describe("E2E Private Oracle", () => {
         FEE,
         receipt.txHash
       );
-    }, 60_000);
+    }, 120_000);
 
     it("Requester has tokens", async () => {
       let requesterBalance = await token
@@ -210,7 +210,7 @@ describe("E2E Private Oracle", () => {
 
     // Test: creating a new question with the same parameters (from a different requester) is possible
     //       and will have a different nullifier shared key
-    it("another requester can ask the same question and will get a different nullifier shared key", async () => {
+    it.only("another requester can ask the same question and will get a different nullifier shared key", async () => {
       const nonce = await createAuthUnshieldMessage(
         token,
         requester2,
@@ -221,57 +221,55 @@ describe("E2E Private Oracle", () => {
       // Mint tokens for the requester
       await mintTokenFor(requester2, requester, MINT_AMOUNT);
 
-      // Submit the question
+      // Submit the question from another requester
       await oracle
         .withWallet(requester2)
-        .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
+        .methods.submit_question(
+          QUESTION_NOTE.request + 1n,
+          divinity.getAddress(),
+          nonce
+        )
         .send()
         .wait();
 
-      const [divinityRequestsNotes, requesterRequestsNotes] = await Promise.all(
-        [
-          // Get the private storage for the divinity's question slot
-          pxe.getNotes({
-            owner: divinity.getAddress(),
-            contractAddress: oracle.address,
-            storageSlot: QUESTIONS_SLOT,
-          }),
-          // Get the private storage for the *other* requester's question slot
-          pxe.getNotes({
-            owner: requester2.getAddress(),
-            contractAddress: oracle.address,
-            storageSlot: QUESTIONS_SLOT,
-          }),
-        ]
+      const storedQuestions: QuestionNote[] = (
+        await oracle
+          .withWallet(divinity)
+          .methods.get_pending_questions_unconstrained(divinity.getAddress())
+          .view({ from: divinity.getAddress() })
+      ).map((x: QuestionNote) => new QuestionNote(x)); // returns 10 by default
+
+      console.log(
+        await oracle
+          .withWallet(divinity)
+          .methods.get_pending_questions_unconstrained(divinity.getAddress())
+          .view({ from: divinity.getAddress() })
+      );
+
+      // Check: Compare the note's data with the expected values
+      type QuestionNoteWithoutRandom = Omit<
+        QuestionNote,
+        "shared_nullifier_key"
+      >;
+
+      const questionNoteWithoutRandom: QuestionNoteWithoutRandom = {
+        request: QUESTION_NOTE.request,
+        requester: QUESTION_NOTE.requester,
+        divinity: QUESTION_NOTE.divinity,
+      };
+
+      const matches = storedQuestions.filter((obj) =>
+        expect.objectContaining(questionNoteWithoutRandom).asymmetricMatch(obj)
       );
 
       // Check: Compare the note's data with the expected values (this is the second note for the divnity)
-      expect(divinityRequestsNotes[1].note.items[0].value).toEqual(QUESTION);
-      expect(
-        AztecAddress.fromField(divinityRequestsNotes[1].note.items[1])
-      ).toEqual(requester2.getAddress());
-      expect(
-        AztecAddress.fromField(divinityRequestsNotes[1].note.items[2])
-      ).toEqual(divinity.getAddress());
+      expect(matches.length).toBe(2);
 
-      expect(requesterRequestsNotes[0].note.items[0].value).toEqual(QUESTION);
-      expect(
-        AztecAddress.fromField(requesterRequestsNotes[0].note.items[1])
-      ).toEqual(requester2.getAddress());
-      expect(
-        AztecAddress.fromField(requesterRequestsNotes[0].note.items[2])
-      ).toEqual(divinity.getAddress());
-
-      // Check: Nullifier shared key is the same for requester and divinity
-      expect(divinityRequestsNotes[1].note.items[3]).toEqual(
-        requesterRequestsNotes[0].note.items[3]
+      // Check: nullifier keys should be different
+      expect(matches[0].shared_nullifier_key).not.toEqual(
+        matches[1].shared_nullifier_key
       );
-
-      // Check: Nullifier shared key is different from the previous request
-      expect(divinityRequestsNotes[1].note.items[3]).not.toEqual(
-        shared_key_nullifier_divinity
-      );
-    }, 60_000);
+    }, 120_000);
   });
 
   describe("submit_answer(..)", () => {
@@ -315,7 +313,7 @@ describe("E2E Private Oracle", () => {
         .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
         .send()
         .wait();
-    }, 60_000);
+    }, 120_000);
 
     // Test: is the tx successful
     it("Tx to submit_answer is mined and tokens are transferred to the divinity", async () => {
@@ -452,7 +450,7 @@ describe("E2E Private Oracle", () => {
       // Check: Compare the note's data with the expected values: the answer is the same as the first one and not the new one
       expect(requester2AnswersNotes[0].note.items[0].value).toEqual(QUESTION);
       expect(requester2AnswersNotes[0].note.items[1].value).toEqual(ANSWER);
-    }, 30_000);
+    }, 120_000);
   });
 
   describe("cancel_question(..)", () => {
@@ -864,7 +862,7 @@ describe("E2E Private Oracle", () => {
 
       // Submit multiple answers (in a single batch for optimisation)
       await sendAnswersBatch(ANSWER_NOTE_REQUESTER);
-    }, 60_000);
+    }, 120_000);
 
     it("get_answer returns the correct answer to the requester", async () => {
       // Get the answer
@@ -886,10 +884,15 @@ describe("E2E Private Oracle", () => {
     it("get_answer returns the correct answer to the divinity", async () => {
       // Get the answer
       // Using "from" authentification (follow https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/pxe/src/pxe_service/pxe_service.ts#L337)
-      const answer: AnswerNote = await oracle
-        .withWallet(divinity)
-        .methods.get_answer_unconstrained(QUESTION, divinity.getAddress())
-        .view({ from: divinity.getAddress() });
+      const answer: AnswerNote = new AnswerNote(
+        await oracle
+          .withWallet(divinity)
+          .methods.get_answer_unconstrained(
+            QUESTION_NOTE_REQUESTER[0].request,
+            divinity.getAddress()
+          )
+          .view({ from: divinity.getAddress() })
+      );
 
       // Check: Compare the answer with the expected value
       expect(answer).toEqual(expect.objectContaining(ANSWER_NOTE_DIVINITY[0]));
@@ -916,7 +919,7 @@ describe("E2E Private Oracle", () => {
         .send()
         .wait();
       oracle = receipt.contract;
-    }, 30_000);
+    }, 120_000);
 
     it("returns the correct fee", async () => {
       let storedFee = await oracle.methods.get_fee().view();

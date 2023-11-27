@@ -145,7 +145,10 @@ describe("E2E Private Oracle", () => {
         (
           await oracle
             .withWallet(divinity)
-            .methods.get_pending_questions_unconstrained(divinity.getAddress())
+            .methods.get_pending_questions_unconstrained(
+              divinity.getAddress(),
+              0n
+            )
             .view({ from: divinity.getAddress() })
         )[0]
       ); // returns 10 by default
@@ -175,7 +178,10 @@ describe("E2E Private Oracle", () => {
       const question: QuestionNote = (
         await oracle
           .withWallet(requester)
-          .methods.get_pending_questions_unconstrained(divinity.getAddress())
+          .methods.get_pending_questions_unconstrained(
+            divinity.getAddress(),
+            0n
+          )
           .view({ from: requester.getAddress() })
       ).map((x: QuestionNote) => new QuestionNote(x))[0]; // returns 10 by default
 
@@ -233,7 +239,10 @@ describe("E2E Private Oracle", () => {
       const storedQuestions: QuestionNote[] = (
         await oracle
           .withWallet(divinity)
-          .methods.get_pending_questions_unconstrained(divinity.getAddress())
+          .methods.get_pending_questions_unconstrained(
+            divinity.getAddress(),
+            0n
+          )
           .view({ from: divinity.getAddress() })
       ).map((x: QuestionNote) => new QuestionNote(x)); // returns 10 by default
 
@@ -356,12 +365,12 @@ describe("E2E Private Oracle", () => {
       const answer: AnswerNote = (
         await oracle
           .withWallet(divinity)
-          .methods.get_answers_unconstrained(divinity.getAddress())
+          .methods.get_answers_unconstrained(divinity.getAddress(), 0n)
           .view({ from: divinity.getAddress() })
       ).map((x: AnswerNote) => new AnswerNote(x))[0];
 
       // Check: are all answers included in the array (will return 10 notes, 3 and 7 which are uninitialized)
-      expect(answer).toEqual(expect.objectContaining(ANSWER_NOTE_REQUESTER));
+      expect(answer).toEqual(expect.objectContaining(ANSWER_NOTE_DIVINITY));
     });
 
     // Test: Is the data of the answer note stored correct, for the requester?
@@ -372,7 +381,7 @@ describe("E2E Private Oracle", () => {
       const answer: AnswerNote = (
         await oracle
           .withWallet(requester)
-          .methods.get_answers_unconstrained(requester.getAddress())
+          .methods.get_answers_unconstrained(requester.getAddress(), 0n)
           .view({ from: requester.getAddress() })
       ).map((x: AnswerNote) => new AnswerNote(x))[0];
 
@@ -386,7 +395,7 @@ describe("E2E Private Oracle", () => {
       const requesterRequestsNotes: QuestionNote[] = (
         await oracle
           .withWallet(requester)
-          .methods.get_questions_unconstrained(requester.getAddress())
+          .methods.get_questions_unconstrained(requester.getAddress(), 0n)
           .view({ from: requester.getAddress() })
       ).map((x: QuestionNote) => new QuestionNote(x));
 
@@ -407,7 +416,10 @@ describe("E2E Private Oracle", () => {
       const divinityRequestsNotes: QuestionNote[] = (
         await oracle
           .withWallet(requester)
-          .methods.get_pending_questions_unconstrained(divinity.getAddress())
+          .methods.get_pending_questions_unconstrained(
+            divinity.getAddress(),
+            0n
+          )
           .view({ from: requester.getAddress() })
       ).map((x: QuestionNote) => new QuestionNote(x));
 
@@ -446,23 +458,26 @@ describe("E2E Private Oracle", () => {
       await oracle
         .withWallet(divinity)
         .methods.submit_answer(
-          QUESTION,
+          QUESTION_NOTE.request,
           requester2.getAddress(),
-          ALTERNATIVE_ANSWER
+          ANSWER_NOTE_REQUESTER.answer + 1n
         )
         .send()
         .wait();
 
-      // Get the private storage for the requester's answer slot
-      const requester2AnswersNotes = await pxe.getNotes({
-        owner: requester2.getAddress(),
-        contractAddress: oracle.address,
-        storageSlot: ANSWERS_SLOT,
-      });
-
       // Check: Compare the note's data with the expected values: the answer is the same as the first one and not the new one
-      expect(requester2AnswersNotes[0].note.items[0].value).toEqual(QUESTION);
-      expect(requester2AnswersNotes[0].note.items[1].value).toEqual(ANSWER);
+      const answer: AnswerNote = new AnswerNote(
+        await oracle
+          .withWallet(requester)
+          .methods.get_answer_unconstrained(
+            QUESTION_NOTE.request,
+            requester.getAddress()
+          )
+          .view({ from: requester.getAddress() })
+      );
+
+      // Check: Compare the answer with the expected value
+      expect(answer).toEqual(ANSWER_NOTE_REQUESTER);
     }, 120_000);
   });
 
@@ -606,7 +621,7 @@ describe("E2E Private Oracle", () => {
       const questions: QuestionNote[] = (
         await oracle
           .withWallet(requester)
-          .methods.get_questions_unconstrained(requester.getAddress())
+          .methods.get_questions_unconstrained(requester.getAddress(), 0n)
           .view({ from: requester.getAddress() })
       ).map((x: QuestionNote) => new QuestionNote(x));
 
@@ -637,7 +652,7 @@ describe("E2E Private Oracle", () => {
       const questions: QuestionNote[] = (
         await oracle
           .withWallet(divinity)
-          .methods.get_questions_unconstrained(requester.getAddress())
+          .methods.get_questions_unconstrained(requester.getAddress(), 0n)
           .view({ from: divinity.getAddress() })
       ).map((x: QuestionNote) => new QuestionNote(x));
 
@@ -704,7 +719,10 @@ describe("E2E Private Oracle", () => {
       const questions: QuestionNote[] = (
         await oracle
           .withWallet(requester)
-          .methods.get_pending_questions_unconstrained(divinity.getAddress())
+          .methods.get_pending_questions_unconstrained(
+            divinity.getAddress(),
+            0n
+          )
           .view({ from: requester.getAddress() })
       ).map((x: QuestionNote) => new QuestionNote(x));
 
@@ -735,7 +753,10 @@ describe("E2E Private Oracle", () => {
       const questions: QuestionNote[] = (
         await oracle
           .withWallet(divinity)
-          .methods.get_pending_questions_unconstrained(divinity.getAddress())
+          .methods.get_pending_questions_unconstrained(
+            divinity.getAddress(),
+            0n
+          )
           .view({ from: divinity.getAddress() })
       ).map((x: QuestionNote) => new QuestionNote(x));
 
@@ -812,7 +833,7 @@ describe("E2E Private Oracle", () => {
       const answer: AnswerNote[] = (
         await oracle
           .withWallet(requester)
-          .methods.get_answers_unconstrained(requester.getAddress())
+          .methods.get_answers_unconstrained(requester.getAddress(), 0n)
           .view({ from: requester.getAddress() })
       ).map((x: AnswerNote) => new AnswerNote(x));
 
@@ -825,7 +846,7 @@ describe("E2E Private Oracle", () => {
       const answer: AnswerNote[] = (
         await oracle
           .withWallet(divinity)
-          .methods.get_answers_unconstrained(divinity.getAddress())
+          .methods.get_answers_unconstrained(divinity.getAddress(), 0n)
           .view({ from: divinity.getAddress() })
       ).map((x: AnswerNote) => new AnswerNote(x));
 

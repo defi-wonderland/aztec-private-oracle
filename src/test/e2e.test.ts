@@ -1110,10 +1110,29 @@ const mintTokenFor = async (
 const sendQuestionsBatch = async (questionNotes: QuestionNote[]) => {
   // Create 3 nonces for token transfer
   const nonces: Fr[] = await Promise.all([
-    createAuthUnshieldMessage(token, requester, oracle.address, FEE),
-    createAuthUnshieldMessage(token, requester, oracle.address, FEE),
-    createAuthUnshieldMessage(token, requester, oracle.address, FEE),
+    createAuthEscrowMessage(
+      token,
+      requester,
+      oracle.address,
+      [requester.getAddress(), oracle.address, ADDRESS_ZERO, ADDRESS_ZERO],
+      FEE
+    ),
+    createAuthEscrowMessage(
+      token,
+      requester,
+      oracle.address,
+      [requester.getAddress(), oracle.address, ADDRESS_ZERO, ADDRESS_ZERO],
+      FEE
+    ),
+    createAuthEscrowMessage(
+      token,
+      requester,
+      oracle.address,
+      [requester.getAddress(), oracle.address, ADDRESS_ZERO, ADDRESS_ZERO],
+      FEE
+    ),
   ]);
+
   const batchQuestions = new BatchCall(requester, [
     oracle.methods
       .submit_question(

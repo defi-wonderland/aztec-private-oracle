@@ -12,6 +12,18 @@ struct FromBurnPublicStruct {
   address: Field,
 }
 
+struct FromEscrowStruct {
+  address: Field,
+}
+
+struct AgentEscrowStruct {
+  address: Field,
+}
+
+struct ParticipantsEscrowStruct {
+  address: Field,
+}
+
 struct ToMintPublicStruct {
   address: Field,
 }
@@ -25,6 +37,14 @@ struct NewAdminSetAdminStruct {
 }
 
 struct MinterSetMinterStruct {
+  address: Field,
+}
+
+struct AgentSettleEscrowStruct {
+  address: Field,
+}
+
+struct RecipientSettleEscrowStruct {
   address: Field,
 }
 
@@ -101,6 +121,29 @@ impl TokenPrivateContextInterface {
   }
   
 
+  pub fn escrow(
+    self,
+    context: &mut PrivateContext,
+    from: FromEscrowStruct,
+    agent: AgentEscrowStruct,
+    amount: Field,
+    participants: [ParticipantsEscrowStruct;4],
+    nonce: Field
+  ) -> [Field; RETURN_VALUES_LENGTH] {
+    let mut serialized_args = [0; 8];
+    serialized_args[0] = from.address;
+    serialized_args[1] = agent.address;
+    serialized_args[2] = amount;
+    serialized_args[3] = participants[0].address;
+    serialized_args[4] = participants[1].address;
+    serialized_args[5] = participants[2].address;
+    serialized_args[6] = participants[3].address;
+    serialized_args[7] = nonce;
+
+    context.call_private_function(self.address, 0x7c289f70, serialized_args)
+  }
+  
+
   pub fn mint_private(
     self,
     context: &mut PrivateContext,
@@ -168,6 +211,26 @@ impl TokenPrivateContextInterface {
     serialized_args[1] = approve as Field;
 
     context.call_public_function(self.address, 0x7f020b80, serialized_args)
+  }
+  
+
+  pub fn settle_escrow(
+    self,
+    context: &mut PrivateContext,
+    agent: AgentSettleEscrowStruct,
+    recipient: RecipientSettleEscrowStruct,
+    amount: Field,
+    randomness: Field,
+    nonce: Field
+  ) -> [Field; RETURN_VALUES_LENGTH] {
+    let mut serialized_args = [0; 5];
+    serialized_args[0] = agent.address;
+    serialized_args[1] = recipient.address;
+    serialized_args[2] = amount;
+    serialized_args[3] = randomness;
+    serialized_args[4] = nonce;
+
+    context.call_private_function(self.address, 0x9cde20b1, serialized_args)
   }
   
 

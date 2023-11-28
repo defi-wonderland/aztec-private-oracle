@@ -41,7 +41,18 @@ contract PrivateOracle {
     use crate::types::answer_note:: {AnswerNote, AnswerNoteMethods, ANSWER_NOTE_LEN};
     use crate::types::fee_note:: {FeeNote, FeeNoteMethods, FEE_NOTE_LEN};
     use crate::types::payment_token_note:: {PaymentTokenNote, PaymentTokenNoteMethods, PAYMENT_TOKEN_NOTE_LEN};
-    use crate::types::token::{TokenPrivateContextInterface, FromTransferPublicStruct, ToTransferPublicStruct, FromUnshieldStruct, ToUnshieldStruct};
+    use crate::types::token::{
+        TokenPrivateContextInterface, 
+        FromTransferPublicStruct, 
+        ToTransferPublicStruct, 
+        FromUnshieldStruct, 
+        ToUnshieldStruct,
+        FromEscrowStruct,
+        AgentEscrowStruct,
+        ParticipantsEscrowStruct,
+        RecipientSettleEscrowStruct,
+        AgentSettleEscrowStruct
+    };
 
     use dep::std::option::Option;
 
@@ -146,13 +157,19 @@ contract PrivateOracle {
         let sender = AztecAddress::new(context.msg_sender());
 
         // Take the payment from the user
-        let _ = TokenPrivateContextInterface::at(payment_token.address).unshield(
-            &mut context, 
-            FromUnshieldStruct { address: sender.address }, 
-            ToUnshieldStruct { address: address_this.address }, 
-            fee, 
+        let escrow_randomness = TokenPrivateContextInterface::at(payment_token.address).escrow(
+            &mut context,
+            FromEscrowStruct { address: sender.address },
+            AgentEscrowStruct { address: address_this.address },
+            fee,
+            [
+                ParticipantsEscrowStruct { address: sender.address },
+                ParticipantsEscrowStruct { address: divinity_address.address },
+                ParticipantsEscrowStruct { address: 0 },
+                ParticipantsEscrowStruct { address: 0 }
+            ],
             nonce
-        );
+        )[0];
 
         // Assert if question doesn't already exist from the same requester
         let question_getter_option = NoteGetterOptions::new().select(0, question).select(1, sender.address).set_limit(1);
@@ -167,7 +184,8 @@ contract PrivateOracle {
             question,
             sender, 
             divinity_address,
-            random_nullifier_shared_key
+            random_nullifier_shared_key,
+            escrow_randomness
         );
 
         // Commit the note in the data tree and send to requester
@@ -253,15 +271,18 @@ contract PrivateOracle {
         storage.answers.insert(&mut new_answer_note_for_divinity, true);
         storage.answers.insert(&mut new_answer_note_for_requester, true);
 
+        let escrow_randomness = request.unwrap_unchecked().escrow_randomness;
+
         // Nullify the question note (will nullify both divinity and requester notes, via the shared key)
         storage.questions.remove(request.unwrap_unchecked());
 
         // Pay the divinity
-        TokenPrivateContextInterface::at(payment_token.address).transfer_public(
-            &mut context, 
-            FromTransferPublicStruct { address: address_this.address }, 
-            ToTransferPublicStruct { address: divinity_calling.address }, 
-            fee, 
+        let _ = TokenPrivateContextInterface::at(payment_token.address).settle_escrow(
+            &mut context,
+            AgentSettleEscrowStruct { address: address_this.address },
+            RecipientSettleEscrowStruct { address: divinity_calling.address }, 
+            fee,
+            escrow_randomness,
             0
         );
     }
@@ -295,15 +316,18 @@ contract PrivateOracle {
         let question_getter_option = NoteGetterOptions::new().select(0, question).select(1, caller.address).set_limit(1);
         let question_note = storage.questions.get_notes(question_getter_option)[0].unwrap_unchecked();
 
+        let escrow_randomness = question_note.escrow_randomness;
+
         // nullify the note
         storage.questions.remove(question_note);
 
         // Return funds to user
-        TokenPrivateContextInterface::at(payment_token.address).transfer_public(
-            &mut context, 
-            FromTransferPublicStruct { address: address_this.address }, 
-            ToTransferPublicStruct { address: caller.address }, 
-            fee, 
+        let _ = TokenPrivateContextInterface::at(payment_token.address).settle_escrow(
+            &mut context,
+            AgentSettleEscrowStruct { address: address_this.address },
+            RecipientSettleEscrowStruct { address: caller.address }, 
+            fee,
+            escrow_randomness,
             0
         );
     }

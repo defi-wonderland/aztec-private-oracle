@@ -1114,21 +1114,36 @@ const sendQuestionsBatch = async (questionNotes: QuestionNote[]) => {
       token,
       requester,
       oracle.address,
-      [requester.getAddress(), oracle.address, ADDRESS_ZERO, ADDRESS_ZERO],
+      [
+        requester.getAddress(),
+        divinity.getAddress(),
+        ADDRESS_ZERO,
+        ADDRESS_ZERO,
+      ],
       FEE
     ),
     createAuthEscrowMessage(
       token,
       requester,
       oracle.address,
-      [requester.getAddress(), oracle.address, ADDRESS_ZERO, ADDRESS_ZERO],
+      [
+        requester.getAddress(),
+        divinity.getAddress(),
+        ADDRESS_ZERO,
+        ADDRESS_ZERO,
+      ],
       FEE
     ),
     createAuthEscrowMessage(
       token,
       requester,
       oracle.address,
-      [requester.getAddress(), oracle.address, ADDRESS_ZERO, ADDRESS_ZERO],
+      [
+        requester.getAddress(),
+        divinity.getAddress(),
+        ADDRESS_ZERO,
+        ADDRESS_ZERO,
+      ],
       FEE
     ),
   ]);

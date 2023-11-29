@@ -1251,16 +1251,14 @@ function createCorrectNotes(
       (i) => {
         return new QuestionNote({
           request: QUESTION + BigInt(i),
-          requester: requester.getAddress(),
-          divinity: divinity.getAddress(),
+          requester_address: requester.getAddress(),
+          divinity_address: divinity.getAddress(),
           shared_nullifier_key: 0n, // Generated while submitting the question, in the contract
         });
       }
     ),
-      Array.from(
-        { length: number !== undefined ? number : 3 },
-        (_, i) => i
-      ).map((i) => {
+    Array.from({ length: number !== undefined ? number : 3 }, (_, i) => i).map(
+      (i) => {
         return new AnswerNote({
           request: QUESTION + BigInt(i),
           answer: ANSWER + BigInt(i),
@@ -1268,6 +1266,7 @@ function createCorrectNotes(
           divinity: divinity.getAddress(),
           owner: owner.getAddress(),
         });
-      });,
+      }
+    ),
   ];
 }

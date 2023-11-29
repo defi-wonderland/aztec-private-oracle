@@ -699,6 +699,43 @@ describe("E2E Private Oracle", () => {
         )
       );
     });
+
+    it("get_questions returns the correct questions when using an offset", async () => {
+      // submit 20 questions
+      const [QUESTION_NOTE_REQUESTER_2] = createCorrectNotes(requester, 20);
+
+      // Submit the questions (in a single batch for optimisation)
+      await sendQuestionsBatch(QUESTION_NOTE_REQUESTER_2);
+
+      // get the questions
+      const questions: QuestionNote[] = (
+        await oracle
+          .withWallet(requester)
+          .methods.get_questions_unconstrained(requester.getAddress(), 10n)
+          .view({ from: requester.getAddress() })
+      ).map((x: QuestionNote) => new QuestionNote(x));
+
+      // Check: are all questions included in the array (will return 10 notes, 3 and 7 which are uninitialized)
+      // Match on the 3 deterministic fields of each note (ie drop the random shared key nullifier)
+      type QuestionNoteWithoutRandom = Omit<
+        QuestionNote,
+        "shared_nullifier_key"
+      >;
+
+      expect(questions).toEqual(
+        expect.arrayContaining(
+          QUESTION_NOTE_REQUESTER.slice(10).map((questionNote) => {
+            const noteWithoutNullifier: QuestionNoteWithoutRandom = {
+              request: questionNote.request,
+              requester: questionNote.requester,
+              divinity: questionNote.divinity,
+            };
+
+            return expect.objectContaining(noteWithoutNullifier);
+          })
+        )
+      );
+    });
   });
 
   describe("unconstrained: get_pending_questions_unconstrained(..)", () => {
@@ -803,6 +840,43 @@ describe("E2E Private Oracle", () => {
         )
       );
     });
+
+    it("get_pending_questions_unconstrained returns the correct questions when using an offset", async () => {
+      // submit 20 questions
+      const [QUESTION_NOTE_REQUESTER_2] = createCorrectNotes(requester, 20);
+
+      // Submit the questions (in a single batch for optimisation)
+      await sendQuestionsBatch(QUESTION_NOTE_REQUESTER_2);
+
+      // get the questions
+      const questions: QuestionNote[] = (
+        await oracle
+          .withWallet(requester)
+          .methods.get_questions_unconstrained(requester.getAddress(), 10n)
+          .view({ from: requester.getAddress() })
+      ).map((x: QuestionNote) => new QuestionNote(x));
+
+      // Check: are all questions included in the array (will return 10 notes, 3 and 7 which are uninitialized)
+      // Match on the 3 deterministic fields of each note (ie drop the random shared key nullifier)
+      type QuestionNoteWithoutRandom = Omit<
+        QuestionNote,
+        "shared_nullifier_key"
+      >;
+
+      expect(questions).toEqual(
+        expect.arrayContaining(
+          QUESTION_NOTE_REQUESTER.slice(10).map((questionNote) => {
+            const noteWithoutNullifier: QuestionNoteWithoutRandom = {
+              request: questionNote.request,
+              requester: questionNote.requester,
+              divinity: questionNote.divinity,
+            };
+
+            return expect.objectContaining(noteWithoutNullifier);
+          })
+        )
+      );
+    });
   });
 
   describe("unconstrained: get_answers_unconstrained(..)", () => {
@@ -815,9 +889,9 @@ describe("E2E Private Oracle", () => {
     beforeAll(async () => {
       // Create the answer notes we should get
       [QUESTION_NOTE_DIVINITY, ANSWER_NOTE_DIVINITY] =
-        createCorrectNotes(divinity);
+        createCorrectNotes(divinity, 20);
       [QUESTION_NOTE_REQUESTER, ANSWER_NOTE_REQUESTER] =
-        createCorrectNotes(requester);
+        createCorrectNotes(requester, 20);
 
       // Deploy the token
       token = await TokenContract.deploy(deployer, requester.getAddress())
@@ -860,7 +934,7 @@ describe("E2E Private Oracle", () => {
       ).map((x: AnswerNote) => new AnswerNote(x));
 
       // Check: are all answers included in the array (will return 10 notes, 3 and 7 which are uninitialized)
-      expect(answer).toEqual(expect.arrayContaining(ANSWER_NOTE_REQUESTER));
+      expect(answer).toEqual(expect.arrayContaining(ANSWER_NOTE_REQUESTER.slice(0, 10)));
     });
 
     it("get_answer returns the correct answers to the divinity", async () => {
@@ -873,7 +947,20 @@ describe("E2E Private Oracle", () => {
       ).map((x: AnswerNote) => new AnswerNote(x));
 
       // Check: Compare the answer with the expected value
-      expect(answer).toEqual(expect.arrayContaining(ANSWER_NOTE_DIVINITY));
+      expect(answer).toEqual(expect.arrayContaining(ANSWER_NOTE_DIVINITY.slice(0, 10)));
+    });
+
+    it("get_answer returns the correct answers when using an offset", async () => {
+      // get the answers
+      const answer: AnswerNote[] = (
+        await oracle
+          .withWallet(divinity)
+          .methods.get_answers_unconstrained(divinity.getAddress(), 10n)
+          .view({ from: divinity.getAddress() })
+      ).map((x: AnswerNote) => new AnswerNote(x));
+
+      // Check: Compare the answer with the expected value
+      expect(answer).toEqual(expect.arrayContaining(ANSWER_NOTE_DIVINITY.slice(10)));
     });
   });
 
@@ -1108,147 +1195,79 @@ const mintTokenFor = async (
 };
 
 const sendQuestionsBatch = async (questionNotes: QuestionNote[]) => {
-  // Create 3 nonces for token transfer
-  const nonces: Fr[] = await Promise.all([
-    createAuthEscrowMessage(
-      token,
-      requester,
-      oracle.address,
-      [
-        requester.getAddress(),
-        divinity.getAddress(),
-        ADDRESS_ZERO,
-        ADDRESS_ZERO,
-      ],
-      FEE
-    ),
-    createAuthEscrowMessage(
-      token,
-      requester,
-      oracle.address,
-      [
-        requester.getAddress(),
-        divinity.getAddress(),
-        ADDRESS_ZERO,
-        ADDRESS_ZERO,
-      ],
-      FEE
-    ),
-    createAuthEscrowMessage(
-      token,
-      requester,
-      oracle.address,
-      [
-        requester.getAddress(),
-        divinity.getAddress(),
-        ADDRESS_ZERO,
-        ADDRESS_ZERO,
-      ],
-      FEE
-    ),
-  ]);
+  // Create nonces for token transfer
+  const nonces: Fr[] = await Promise.all(
+    questionNotes.map((_) =>
+      createAuthEscrowMessage(
+        token,
+        requester,
+        oracle.address,
+        [
+          requester.getAddress(),
+          divinity.getAddress(),
+          ADDRESS_ZERO,
+          ADDRESS_ZERO,
+        ],
+        FEE
+      )
+    )
+  );
 
-  const batchQuestions = new BatchCall(requester, [
-    oracle.methods
-      .submit_question(
-        questionNotes[0].request,
-        divinity.getAddress(),
-        nonces[0]
-      )
-      .request(),
-    oracle.methods
-      .submit_question(
-        questionNotes[1].request,
-        divinity.getAddress(),
-        nonces[1]
-      )
-      .request(),
-    oracle.methods
-      .submit_question(
-        questionNotes[2].request,
-        divinity.getAddress(),
-        nonces[2]
-      )
-      .request(),
-  ]);
+  const batchQuestions = new BatchCall(
+    requester,
+    questionNotes.map((questionNote, i) =>
+      oracle.methods
+        .submit_question(questionNote.request, divinity.getAddress(), nonces[i])
+        .request()
+    )
+  );
 
   await batchQuestions.send().wait();
 };
 
 const sendAnswersBatch = async (answerNotes: AnswerNote[]) => {
-  const batchAnswers = new BatchCall(divinity, [
-    oracle.methods
-      .submit_answer(
-        answerNotes[0].request,
-        requester.getAddress(),
-        answerNotes[0].answer
-      )
-      .request(),
-    oracle.methods
-      .submit_answer(
-        answerNotes[1].request,
-        requester.getAddress(),
-        answerNotes[1].answer
-      )
-      .request(),
-    oracle.methods
-      .submit_answer(
-        answerNotes[2].request,
-        requester.getAddress(),
-        answerNotes[2].answer
-      )
-      .request(),
-  ]);
+  const batchAnswers = new BatchCall(
+    divinity,
+    answerNotes.map((answerNote) =>
+      oracle.methods
+        .submit_answer(
+          answerNote.request,
+          requester.getAddress(),
+          answerNote.answer
+        )
+        .request()
+    )
+  );
 
   await batchAnswers.send().wait();
 };
 
 function createCorrectNotes(
-  owner: AccountWalletWithPrivateKey
+  owner: AccountWalletWithPrivateKey,
+  number?: number
 ): [QuestionNote[], AnswerNote[]] {
   return [
-    [
-      {
-        request: QUESTION,
-        requester: requester.getAddress(),
-        divinity: divinity.getAddress(),
-        shared_nullifier_key: 0n, // Generated while submitting the question, in the contract
-      },
-      {
-        request: QUESTION + 1n,
-        requester: requester.getAddress(),
-        divinity: divinity.getAddress(),
-        shared_nullifier_key: 0n,
-      },
-      {
-        request: QUESTION + 2n,
-        requester: requester.getAddress(),
-        divinity: divinity.getAddress(),
-        shared_nullifier_key: 0n,
-      },
-    ],
-    [
-      {
-        request: QUESTION,
-        answer: ANSWER,
-        requester: requester.getAddress(),
-        divinity: divinity.getAddress(),
-        owner: owner.getAddress(),
-      },
-      {
-        request: QUESTION + 1n,
-        answer: ANSWER + 1n,
-        requester: requester.getAddress(),
-        divinity: divinity.getAddress(),
-        owner: owner.getAddress(),
-      },
-      {
-        request: QUESTION + 2n,
-        answer: ANSWER + 2n,
-        requester: requester.getAddress(),
-        divinity: divinity.getAddress(),
-        owner: owner.getAddress(),
-      },
-    ],
+    Array.from({ length: number !== undefined ? number : 3 }, (_, i) => i).map(
+      (i) => {
+        return new QuestionNote({
+          request: QUESTION + BigInt(i),
+          requester: requester.getAddress(),
+          divinity: divinity.getAddress(),
+          shared_nullifier_key: 0n, // Generated while submitting the question, in the contract
+        });
+      }
+    ),
+      Array.from(
+        { length: number !== undefined ? number : 3 },
+        (_, i) => i
+      ).map((i) => {
+        return new AnswerNote({
+          request: QUESTION + BigInt(i),
+          answer: ANSWER + BigInt(i),
+          requester: requester.getAddress(),
+          divinity: divinity.getAddress(),
+          owner: owner.getAddress(),
+        });
+      });,
   ];
 }

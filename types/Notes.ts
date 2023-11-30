@@ -19,9 +19,9 @@ export class AnswerNote {
       // object returned in single note
       this.request = note.request;
       this.answer = note.answer;
-      this.requester = AztecAddress.fromBigInt(note.requester.address);
-      this.divinity = AztecAddress.fromBigInt(note.divinity.address);
-      this.owner = AztecAddress.fromBigInt(note.owner.address);
+      this.requester = note.requester;
+      this.divinity = note.divinity;
+      this.owner = note.owner;
     }
   }
 }
@@ -36,16 +36,16 @@ export class QuestionNote {
     if (note._is_some !== undefined) {
       this.request = note._value.request;
       this.requester = AztecAddress.fromBigInt(
-        note._value.requester_address.address
+      note._value.requester_address.address
       );
       this.divinity = AztecAddress.fromBigInt(
-        note._value.divinity_address.address
+      note._value.divinity_address.address
       );
       this.shared_nullifier_key = note._value.shared_nullifier_key;
     } else {
       this.request = note.request;
-      this.requester = AztecAddress.fromBigInt(note.requester_address.address);
-      this.divinity = AztecAddress.fromBigInt(note.divinity_address.address);
+      this.requester = note.requester_address;
+      this.divinity = note.divinity_address;
       this.shared_nullifier_key = note.shared_nullifier_key;
     }
   }

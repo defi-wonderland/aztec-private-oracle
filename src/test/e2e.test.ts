@@ -281,7 +281,7 @@ describe("E2E Private Oracle", () => {
       );
     }, 60_000);
 
-    it.only("question can be submitted by a third party", async () => {
+    it("question can be submitted by a third party", async () => {
       // requester = sender, executes it
       // requester2 = from, on their behalf
       const question = new Fr(300n);
@@ -298,7 +298,10 @@ describe("E2E Private Oracle", () => {
         FEE
       );
 
-      await createAuthSubmitQuestionMessage(
+      // Mint tokens for the requester
+      await mintTokenFor(requester2, requester, MINT_AMOUNT);
+
+      const action = await createAuthSubmitQuestionMessage(
         oracle,
         requester,
         requester2,
@@ -307,20 +310,8 @@ describe("E2E Private Oracle", () => {
         nonce
       );
 
-      // Mint tokens for the requester
-      await mintTokenFor(requester2, requester, MINT_AMOUNT);
-
       // Submit the question
-      await oracle
-        .withWallet(requester)
-        .methods.submit_question(
-          requester2.getAddress(),
-          QUESTION,
-          divinity.getAddress(),
-          nonce
-        )
-        .send()
-        .wait();
+      await action.send().wait();
 
       const questionNotes = await pxe.getNotes({
         owner: requester2.getAddress(),
@@ -847,7 +838,7 @@ const createAuthSubmitQuestionMessage = async (
 
   await sender.addAuthWitness(witness);
 
-  return nonce;
+  return action;
 };
 
 

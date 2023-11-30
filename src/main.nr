@@ -164,21 +164,27 @@ contract PrivateOracle {
         let payment_token = storage.payment_token.get_note().payment_token;
         let fee = storage.fee.get_note().fee;
         let address_this = AztecAddress::new(context.this_address());
+        let mut escrow_randomness = 0;
 
-        // Take the payment from the user
-        let escrow_randomness = TokenPrivateContextInterface::at(payment_token.address).escrow(
-            &mut context,
-            FromEscrowStruct { address: from.address },
-            AgentEscrowStruct { address: address_this.address },
-            fee,
-            [
-                ParticipantsEscrowStruct { address: from.address },
-                ParticipantsEscrowStruct { address: divinity_address.address },
-                ParticipantsEscrowStruct { address: 0 },
-                ParticipantsEscrowStruct { address: 0 }
-            ],
-            nonce
-        )[0];
+        if(payment_token.address != 0) {
+        
+            // Take the payment from the user
+            escrow_randomness = TokenPrivateContextInterface::at(payment_token.address).escrow(
+                &mut context,
+                FromEscrowStruct { address: from.address },
+                AgentEscrowStruct { address: address_this.address },
+                fee,
+                [
+                    ParticipantsEscrowStruct { address: from.address },
+                    ParticipantsEscrowStruct { address: divinity_address.address },
+                    ParticipantsEscrowStruct { address: 0 },
+                    ParticipantsEscrowStruct { address: 0 }
+                ],
+                nonce
+            )[0];
+        } else {
+            assert(false, "Payment token not set");
+        }
 
         // Assert if question doesn't already exist from the same requester
         let question_getter_option = NoteGetterOptions::new().select(0, question).select(1, from.address).set_limit(1);

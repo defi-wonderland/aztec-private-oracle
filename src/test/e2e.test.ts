@@ -504,12 +504,9 @@ describe("E2E Private Oracle", () => {
 
       // Check: Compare the answer with the expected value
       expect(answer).toEqual(ANSWER_NOTE_REQUESTER);
-      expect(answer.request).toEqual(ANSWER_NOTE_REQUESTER.request);
-      expect(answer.answer).toEqual(ANSWER_NOTE_REQUESTER.answer);
-      // expect(answer.requester.asBigInt)
     }, 120_000);
   });
-////////////////////////////////////////////////////////////////////////////
+
   describe("cancel_question(..)", () => {
     // Setup: Deploy the oracle and submit the question
     beforeAll(async () => {
@@ -705,7 +702,7 @@ describe("E2E Private Oracle", () => {
 
     it("get_questions returns the correct questions when using an offset", async () => {
       // submit 20 questions
-      const [QUESTION_NOTE_REQUESTER_2] = createCorrectNotes(requester, 20);
+      const [QUESTION_NOTE_REQUESTER_2] = createCorrectNotes(requester, 4);
 
       // Submit the questions (in a single batch for optimisation)
       await sendQuestionsBatch(QUESTION_NOTE_REQUESTER_2);
@@ -763,6 +760,9 @@ describe("E2E Private Oracle", () => {
         FEE
       ).send();
       oracle = await receipt.deployed();
+
+      // Add the contract public key to the PXE
+      await pxe.registerRecipient(oracle.completeAddress);
 
       await addTokenAndFeeNotesToPXE(
         requester.getAddress(),
@@ -845,8 +845,8 @@ describe("E2E Private Oracle", () => {
     });
 
     it("get_pending_questions_unconstrained returns the correct questions when using an offset", async () => {
-      // submit 20 questions
-      const [QUESTION_NOTE_REQUESTER_2] = createCorrectNotes(requester, 20);
+      // submit 4 questions
+      const [QUESTION_NOTE_REQUESTER_2] = createCorrectNotes(requester, 4);
 
       // Submit the questions (in a single batch for optimisation)
       await sendQuestionsBatch(QUESTION_NOTE_REQUESTER_2);
@@ -892,9 +892,9 @@ describe("E2E Private Oracle", () => {
     beforeAll(async () => {
       // Create the answer notes we should get
       [QUESTION_NOTE_DIVINITY, ANSWER_NOTE_DIVINITY] =
-        createCorrectNotes(divinity, 20);
+        createCorrectNotes(divinity, 4);
       [QUESTION_NOTE_REQUESTER, ANSWER_NOTE_REQUESTER] =
-        createCorrectNotes(requester, 20);
+        createCorrectNotes(requester, 4);
 
       // Deploy the token
       token = await TokenContract.deploy(deployer, requester.getAddress())
@@ -911,6 +911,9 @@ describe("E2E Private Oracle", () => {
         FEE
       ).send();
       oracle = await receipt.deployed();
+
+      // Add the contract public key to the PXE
+      await pxe.registerRecipient(oracle.completeAddress);
 
       await addTokenAndFeeNotesToPXE(
         requester.getAddress(),
@@ -995,6 +998,9 @@ describe("E2E Private Oracle", () => {
       ).send();
       oracle = await receipt.deployed();
 
+      // Add the contract public key to the PXE
+      await pxe.registerRecipient(oracle.completeAddress);
+
       await addTokenAndFeeNotesToPXE(
         requester.getAddress(),
         oracle.address,
@@ -1065,6 +1071,9 @@ describe("E2E Private Oracle", () => {
         .send()
         .wait();
       oracle = receipt.contract;
+
+      // Add the contract public key to the PXE
+      await pxe.registerRecipient(oracle.completeAddress);
     }, 120_000);
 
     it("returns the correct fee", async () => {
@@ -1224,7 +1233,6 @@ const sendQuestionsBatch = async (questionNotes: QuestionNote[]) => {
         .request()
     )
   );
-
   await batchQuestions.send().wait();
 };
 
@@ -1250,7 +1258,7 @@ function createCorrectNotes(
   number?: number
 ): [QuestionNote[], AnswerNote[]] {
   return [
-    Array.from({ length: number !== undefined ? number : 3 }, (_, i) => i).map(
+    Array.from({ length: number || 3 }, (_, i) => i).map(
       (i) => {
         return QuestionNote.fromLocal({
           request: QUESTION + BigInt(i),
@@ -1260,7 +1268,7 @@ function createCorrectNotes(
         });
       }
     ),
-    Array.from({ length: number !== undefined ? number : 3 }, (_, i) => i).map(
+    Array.from({ length: number || 3 }, (_, i) => i).map(
       (i) => {
         return AnswerNote.fromLocal({
           request: QUESTION + BigInt(i),

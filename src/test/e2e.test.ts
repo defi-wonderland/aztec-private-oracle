@@ -120,7 +120,12 @@ describe("E2E Private Oracle", () => {
       // Submit the question
       const receipt = await oracle
         .withWallet(requester)
-        .methods.submit_question(requester.getAddress(), QUESTION, divinity.getAddress(), nonce)
+        .methods.submit_question(
+          requester.getAddress(),
+          QUESTION,
+          divinity.getAddress(),
+          nonce
+        )
         .send()
         .wait();
 
@@ -207,7 +212,12 @@ describe("E2E Private Oracle", () => {
       // Submit the question
       await oracle
         .withWallet(requester2)
-        .methods.submit_question(requester2.getAddress(), QUESTION, divinity.getAddress(), nonce)
+        .methods.submit_question(
+          requester2.getAddress(),
+          QUESTION,
+          divinity.getAddress(),
+          nonce
+        )
         .send()
         .wait();
 
@@ -271,7 +281,9 @@ describe("E2E Private Oracle", () => {
       );
     }, 60_000);
 
-    it("question can be submitted by a third party", async () => {
+    it.only("question can be submitted by a third party", async () => {
+      // requester = sender, executes it
+      // requester2 = from, on their behalf
       const question = new Fr(300n);
       const nonce = await createAuthEscrowMessage(
         token,
@@ -288,8 +300,8 @@ describe("E2E Private Oracle", () => {
 
       await createAuthSubmitQuestionMessage(
         oracle,
-        requester.getAddress(),
         requester,
+        requester2,
         question,
         divinity.getAddress(),
         nonce
@@ -301,7 +313,12 @@ describe("E2E Private Oracle", () => {
       // Submit the question
       await oracle
         .withWallet(requester)
-        .methods.submit_question(requester2.getAddress(), QUESTION, divinity.getAddress(), nonce)
+        .methods.submit_question(
+          requester2.getAddress(),
+          QUESTION,
+          divinity.getAddress(),
+          nonce
+        )
         .send()
         .wait();
 
@@ -312,7 +329,6 @@ describe("E2E Private Oracle", () => {
       });
 
       console.log(questionNotes);
-
     }, 60_000);
   });
 
@@ -362,7 +378,12 @@ describe("E2E Private Oracle", () => {
       // Submit a question
       await oracle
         .withWallet(requester)
-        .methods.submit_question(requester.getAddress(), QUESTION, divinity.getAddress(), nonce)
+        .methods.submit_question(
+          requester.getAddress(),
+          QUESTION,
+          divinity.getAddress(),
+          nonce
+        )
         .send()
         .wait();
     }, 60_000);
@@ -482,7 +503,12 @@ describe("E2E Private Oracle", () => {
       // Setup: submit the same question from a second requester
       await oracle
         .withWallet(requester2)
-        .methods.submit_question(requester2.getAddress(), QUESTION, divinity.getAddress(), nonce)
+        .methods.submit_question(
+          requester2.getAddress(),
+          QUESTION,
+          divinity.getAddress(),
+          nonce
+        )
         .send()
         .wait();
 
@@ -554,7 +580,12 @@ describe("E2E Private Oracle", () => {
       // Submit a question
       await oracle
         .withWallet(requester)
-        .methods.submit_question(requester.getAddress(), QUESTION, divinity.getAddress(), nonce)
+        .methods.submit_question(
+          requester.getAddress(),
+          QUESTION,
+          divinity.getAddress(),
+          nonce
+        )
         .send()
         .wait();
     }, 60_000);
@@ -649,7 +680,12 @@ describe("E2E Private Oracle", () => {
       // Submit a question
       await oracle
         .withWallet(requester)
-        .methods.submit_question(requester.getAddress(), QUESTION, divinity.getAddress(), nonce)
+        .methods.submit_question(
+          requester.getAddress(),
+          QUESTION,
+          divinity.getAddress(),
+          nonce
+        )
         .send()
         .wait();
 
@@ -787,7 +823,7 @@ const createAuthEscrowMessage = async (
 
 const createAuthSubmitQuestionMessage = async (
   oracle: PrivateOracleContract,
-  sender: AztecAddress,
+  sender: AccountWalletWithPrivateKey,
   from: AccountWalletWithPrivateKey,
   question: Fr,
   divinity: AztecAddress,
@@ -795,19 +831,22 @@ const createAuthSubmitQuestionMessage = async (
 ) => {
   // from: AztecAddress, question: Field, divinity_address: AztecAddress, nonce: Field
   // We need to compute the message we want to sign and add it to the wallet as approved
-  const action = oracle.methods.submit_question(
-    from.getAddress(),
-    question,
-    divinity,
-    nonce
+  const action = oracle
+    .withWallet(sender)
+    .methods.submit_question(from.getAddress(), question, divinity, nonce);
+
+  const messageHash = computeAuthWitMessageHash(
+    sender.getAddress(),
+    action.request()
   );
-  const messageHash = await computeAuthWitMessageHash(sender, action.request());
 
   // Both wallets are connected to same node and PXE so we could just insert directly using
   // await wallet.signAndAddAuthWitness(messageHash, );
   // But doing it in two actions to show the flow.
   const witness = await from.createAuthWitness(messageHash);
-  await from.addAuthWitness(witness);
+
+  await sender.addAuthWitness(witness);
+
   return nonce;
 };
 

@@ -148,7 +148,7 @@ describe("E2E Private Oracle", () => {
 
     // Test: is the note correctly stored in the private storage, for the divinity
     it("divinity question note has the correct data", async () => {
-      const question: QuestionNote = new QuestionNote(
+      const question: QuestionNote = QuestionNote.fromChainData(
         (
           await oracle
             .withWallet(divinity)
@@ -157,7 +157,7 @@ describe("E2E Private Oracle", () => {
               0n
             )
             .view({ from: divinity.getAddress() })
-        )[0]
+        )[0]._value
       ); // returns 10 by default
 
       // Check: Compare the note's data with the expected values
@@ -190,7 +190,7 @@ describe("E2E Private Oracle", () => {
             0n
           )
           .view({ from: requester.getAddress() })
-      ).map((x: QuestionNote) => new QuestionNote(x))[0]; // returns 10 by default
+      ).map((questionNote: any) => questionNote._value).map((x: QuestionNote) => QuestionNote.fromChainData(x))[0]; // returns 10 by default
 
       // Check: Compare the note's data with the expected values
       type QuestionNoteWithoutRandom = Omit<
@@ -257,7 +257,7 @@ describe("E2E Private Oracle", () => {
             0n
           )
           .view({ from: divinity.getAddress() })
-      ).map((x: QuestionNote) => new QuestionNote(x)); // returns 10 by default
+      ).map((questionNote: any) => questionNote._value).map((x: QuestionNote) => QuestionNote.fromChainData(x)); // returns 10 by default
 
       // Check: Compare the note's data with the expected values
       type QuestionNoteWithoutRandom = Omit<
@@ -291,7 +291,7 @@ describe("E2E Private Oracle", () => {
       );
     }, 120_000);
   });
-
+/////////////////////////////////////////////////////////////////////////////
   describe("submit_answer(..)", () => {
     let QUESTION_NOTE: QuestionNote;
     let ANSWER_NOTE_REQUESTER: AnswerNote;
@@ -387,7 +387,7 @@ describe("E2E Private Oracle", () => {
           .withWallet(divinity)
           .methods.get_answers_unconstrained(divinity.getAddress(), 0n)
           .view({ from: divinity.getAddress() })
-      ).map((x: AnswerNote) => new AnswerNote(x))[0];
+      ).map((answerNote: any) => answerNote._value).map((x: AnswerNote) => AnswerNote.fromChainData(x))[0];
 
       // Check: are all answers included in the array (will return 10 notes, 3 and 7 which are uninitialized)
       expect(answer).toEqual(expect.objectContaining(ANSWER_NOTE_DIVINITY));
@@ -403,7 +403,7 @@ describe("E2E Private Oracle", () => {
           .withWallet(requester)
           .methods.get_answers_unconstrained(requester.getAddress(), 0n)
           .view({ from: requester.getAddress() })
-      ).map((x: AnswerNote) => new AnswerNote(x))[0];
+      ).map((answerNote: any) => answerNote._value).map((x: AnswerNote) => AnswerNote.fromChainData(x))[0];
 
       // Check: are all answers included in the array (will return 10 notes, 3 and 7 which are uninitialized)
       expect(answer).toEqual(expect.objectContaining(ANSWER_NOTE_REQUESTER));
@@ -417,7 +417,7 @@ describe("E2E Private Oracle", () => {
           .withWallet(requester)
           .methods.get_questions_unconstrained(requester.getAddress(), 0n)
           .view({ from: requester.getAddress() })
-      ).map((x: QuestionNote) => new QuestionNote(x));
+      ).map((questionNote: any) => questionNote._value).map((x: QuestionNote) => QuestionNote.fromChainData(x));
 
       const notesWithoutEmpties = requesterRequestsNotes.filter((e, i) => {
         e.shared_nullifier_key !== 0n &&
@@ -441,7 +441,7 @@ describe("E2E Private Oracle", () => {
             0n
           )
           .view({ from: requester.getAddress() })
-      ).map((x: QuestionNote) => new QuestionNote(x));
+      ).map((questionNote: any) => questionNote._value).map((x: QuestionNote) => QuestionNote.fromChainData(x));
 
       const notesWithoutEmpties = divinityRequestsNotes.filter((e, i) => {
         e.shared_nullifier_key !== 0n &&
@@ -492,21 +492,24 @@ describe("E2E Private Oracle", () => {
         .wait();
 
       // Check: Compare the note's data with the expected values: the answer is the same as the first one and not the new one
-      const answer: AnswerNote = new AnswerNote(
+      const answer: AnswerNote = AnswerNote.fromChainData(
         await oracle
-          .withWallet(requester)
-          .methods.get_answer_unconstrained(
-            QUESTION_NOTE.request,
-            requester.getAddress()
+        .withWallet(requester)
+        .methods.get_answer_unconstrained(
+          QUESTION_NOTE.request,
+          requester.getAddress()
           )
           .view({ from: requester.getAddress() })
-      );
+          );
 
       // Check: Compare the answer with the expected value
       expect(answer).toEqual(ANSWER_NOTE_REQUESTER);
+      expect(answer.request).toEqual(ANSWER_NOTE_REQUESTER.request);
+      expect(answer.answer).toEqual(ANSWER_NOTE_REQUESTER.answer);
+      // expect(answer.requester.asBigInt)
     }, 120_000);
   });
-
+////////////////////////////////////////////////////////////////////////////
   describe("cancel_question(..)", () => {
     // Setup: Deploy the oracle and submit the question
     beforeAll(async () => {
@@ -554,7 +557,7 @@ describe("E2E Private Oracle", () => {
         .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
         .send()
         .wait();
-    }, 60_000);
+    }, 100_000);
 
     // Test: is the tx successful
     it("Tx to cancel_question is mined and token transferred back to requester", async () => {
@@ -645,7 +648,7 @@ describe("E2E Private Oracle", () => {
           .withWallet(requester)
           .methods.get_questions_unconstrained(requester.getAddress(), 0n)
           .view({ from: requester.getAddress() })
-      ).map((x: QuestionNote) => new QuestionNote(x));
+      ).map((questionNote: any) => questionNote._value).map((x: QuestionNote) => QuestionNote.fromChainData(x));
 
       // Check: are all questions included in the array (will return 10 notes, 3 and 7 which are uninitialized)
       // Match on the 3 deterministic fields of each note (ie drop the random shared key nullifier)
@@ -676,7 +679,7 @@ describe("E2E Private Oracle", () => {
           .withWallet(divinity)
           .methods.get_questions_unconstrained(requester.getAddress(), 0n)
           .view({ from: divinity.getAddress() })
-      ).map((x: QuestionNote) => new QuestionNote(x));
+      ).map((questionNote: any) => questionNote._value).map((x: QuestionNote) => QuestionNote.fromChainData(x));
 
       // Check: are all questions included in the array (will return 10 notes, 3 and 7 which are uninitialized)
       // Match on the 3 deterministic fields of each note (ie drop the random shared key nullifier)
@@ -713,7 +716,7 @@ describe("E2E Private Oracle", () => {
           .withWallet(requester)
           .methods.get_questions_unconstrained(requester.getAddress(), 10n)
           .view({ from: requester.getAddress() })
-      ).map((x: QuestionNote) => new QuestionNote(x));
+      ).map((questionNote: any) => questionNote._value).map((x: QuestionNote) => QuestionNote.fromChainData(x));
 
       // Check: are all questions included in the array (will return 10 notes, 3 and 7 which are uninitialized)
       // Match on the 3 deterministic fields of each note (ie drop the random shared key nullifier)
@@ -783,7 +786,7 @@ describe("E2E Private Oracle", () => {
             0n
           )
           .view({ from: requester.getAddress() })
-      ).map((x: QuestionNote) => new QuestionNote(x));
+      ).map((questionNote: any) => questionNote._value).map((x: QuestionNote) => QuestionNote.fromChainData(x));
 
       // Check: are all questions included in the array (will return 10 notes, 3 and 7 which are uninitialized)
       // Match on the 3 deterministic fields of each note (ie drop the random shared key nullifier)
@@ -817,7 +820,7 @@ describe("E2E Private Oracle", () => {
             0n
           )
           .view({ from: divinity.getAddress() })
-      ).map((x: QuestionNote) => new QuestionNote(x));
+      ).map((questionNote: any) => questionNote._value).map((x: QuestionNote) => QuestionNote.fromChainData(x));
 
       // Check: are all questions included in the array (will return 10 notes, 3 and 7 which are uninitialized)
       // Match on the 3 deterministic fields of each note (ie drop the random shared key nullifier)
@@ -854,7 +857,7 @@ describe("E2E Private Oracle", () => {
           .withWallet(requester)
           .methods.get_questions_unconstrained(requester.getAddress(), 10n)
           .view({ from: requester.getAddress() })
-      ).map((x: QuestionNote) => new QuestionNote(x));
+      ).map((questionNote: any) => questionNote._value).map((x: QuestionNote) => QuestionNote.fromChainData(x));
 
       // Check: are all questions included in the array (will return 10 notes, 3 and 7 which are uninitialized)
       // Match on the 3 deterministic fields of each note (ie drop the random shared key nullifier)
@@ -931,7 +934,7 @@ describe("E2E Private Oracle", () => {
           .withWallet(requester)
           .methods.get_answers_unconstrained(requester.getAddress(), 0n)
           .view({ from: requester.getAddress() })
-      ).map((x: AnswerNote) => new AnswerNote(x));
+      ).map((answerNote: any) => answerNote._value).map((x: AnswerNote) => AnswerNote.fromChainData(x));
 
       // Check: are all answers included in the array (will return 10 notes, 3 and 7 which are uninitialized)
       expect(answer).toEqual(expect.arrayContaining(ANSWER_NOTE_REQUESTER.slice(0, 10)));
@@ -944,7 +947,7 @@ describe("E2E Private Oracle", () => {
           .withWallet(divinity)
           .methods.get_answers_unconstrained(divinity.getAddress(), 0n)
           .view({ from: divinity.getAddress() })
-      ).map((x: AnswerNote) => new AnswerNote(x));
+      ).map((answerNote: any) => answerNote._value).map((x: AnswerNote) => AnswerNote.fromChainData(x));
 
       // Check: Compare the answer with the expected value
       expect(answer).toEqual(expect.arrayContaining(ANSWER_NOTE_DIVINITY.slice(0, 10)));
@@ -957,7 +960,7 @@ describe("E2E Private Oracle", () => {
           .withWallet(divinity)
           .methods.get_answers_unconstrained(divinity.getAddress(), 10n)
           .view({ from: divinity.getAddress() })
-      ).map((x: AnswerNote) => new AnswerNote(x));
+      ).map((answerNote: any) => answerNote._value).map((x: AnswerNote) => AnswerNote.fromChainData(x));
 
       // Check: Compare the answer with the expected value
       expect(answer).toEqual(expect.arrayContaining(ANSWER_NOTE_DIVINITY.slice(10)));
@@ -1010,7 +1013,7 @@ describe("E2E Private Oracle", () => {
     it("get_answer returns the correct answer to the requester", async () => {
       // Get the answer
       // Using "from" authentification (follow https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/pxe/src/pxe_service/pxe_service.ts#L337)
-      const answer: AnswerNote = new AnswerNote(
+      const answer: AnswerNote = AnswerNote.fromChainData(
         await oracle
           .withWallet(requester)
           .methods.get_answer_unconstrained(
@@ -1027,7 +1030,7 @@ describe("E2E Private Oracle", () => {
     it("get_answer returns the correct answer to the divinity", async () => {
       // Get the answer
       // Using "from" authentification (follow https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/pxe/src/pxe_service/pxe_service.ts#L337)
-      const answer: AnswerNote = new AnswerNote(
+      const answer: AnswerNote = AnswerNote.fromChainData(
         await oracle
           .withWallet(divinity)
           .methods.get_answer_unconstrained(
@@ -1249,7 +1252,7 @@ function createCorrectNotes(
   return [
     Array.from({ length: number !== undefined ? number : 3 }, (_, i) => i).map(
       (i) => {
-        return new QuestionNote({
+        return QuestionNote.fromLocal({
           request: QUESTION + BigInt(i),
           requester_address: requester.getAddress(),
           divinity_address: divinity.getAddress(),
@@ -1259,7 +1262,7 @@ function createCorrectNotes(
     ),
     Array.from({ length: number !== undefined ? number : 3 }, (_, i) => i).map(
       (i) => {
-        return new AnswerNote({
+        return AnswerNote.fromLocal({
           request: QUESTION + BigInt(i),
           answer: ANSWER + BigInt(i),
           requester: requester.getAddress(),

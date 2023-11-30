@@ -7,22 +7,32 @@ export class AnswerNote {
   divinity: AztecAddress;
   owner: AztecAddress;
 
-  constructor(note: any) {
-    // object returned in arrays of notes
-    if (note._is_some !== undefined) {
-      this.request = note._value.request;
-      this.answer = note._value.answer;
-      this.requester = AztecAddress.fromBigInt(note._value.requester.address);
-      this.divinity = AztecAddress.fromBigInt(note._value.divinity.address);
-      this.owner = AztecAddress.fromBigInt(note._value.owner.address);
-    } else {
-      // object returned in single note
-      this.request = note.request;
-      this.answer = note.answer;
-      this.requester = note.requester;
-      this.divinity = note.divinity;
-      this.owner = note.owner;
-    }
+  constructor(request: bigint, answer: bigint, requester: AztecAddress, divinity: AztecAddress, owner: AztecAddress) {
+    this.request = request;
+    this.answer = answer;
+    this.requester = requester;
+    this.divinity = divinity;
+    this.owner = owner;
+  }
+
+  static fromChainData(note: any) {
+    return new AnswerNote(
+      note.request,
+      note.answer,
+      AztecAddress.fromBigInt(note.requester.address),
+      AztecAddress.fromBigInt(note.divinity.address),
+      AztecAddress.fromBigInt(note.owner.address),
+    );
+  }
+
+  static fromLocal(note: any) {
+    return new AnswerNote(
+      note.request,
+      note.answer,
+      AztecAddress.fromBigInt(note.requester.asBigInt),
+      AztecAddress.fromBigInt(note.divinity.asBigInt),
+      AztecAddress.fromBigInt(note.owner.asBigInt),
+    );
   }
 }
 
@@ -32,21 +42,28 @@ export class QuestionNote {
   divinity: AztecAddress;
   shared_nullifier_key: bigint;
 
-  constructor(note: any) {
-    if (note._is_some !== undefined) {
-      this.request = note._value.request;
-      this.requester = AztecAddress.fromBigInt(
-      note._value.requester_address.address
-      );
-      this.divinity = AztecAddress.fromBigInt(
-      note._value.divinity_address.address
-      );
-      this.shared_nullifier_key = note._value.shared_nullifier_key;
-    } else {
-      this.request = note.request;
-      this.requester = note.requester_address;
-      this.divinity = note.divinity_address;
-      this.shared_nullifier_key = note.shared_nullifier_key;
-    }
+  constructor(request: bigint, requester: AztecAddress, divinity: AztecAddress, shared_nullifier_key: bigint) {
+    this.request = request;
+    this.requester = requester;
+    this.divinity = divinity;
+    this.shared_nullifier_key = shared_nullifier_key;
+  }
+
+  static fromChainData(note: any) {
+    return new QuestionNote(
+      note.request,
+      AztecAddress.fromBigInt(note.requester_address.address),
+      AztecAddress.fromBigInt(note.divinity_address.address),
+      note.shared_nullifier_key,
+    );
+  }
+
+  static fromLocal(note: any) {
+    return new QuestionNote(
+      note.request,
+      AztecAddress.fromBigInt(note.requester_address.asBigInt),
+      AztecAddress.fromBigInt(note.divinity_address.asBigInt),
+      note.shared_nullifier_key,
+    );
   }
 }

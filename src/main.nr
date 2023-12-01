@@ -37,12 +37,7 @@ Answer:
 mod types;
  
 contract PrivateOracle {
-
-// DEBUG
-use dep::aztec::oracle::debug_log::{ debug_log, debug_log_field };
-// DEBUG
-
-
+    
     use crate::types::question_note:: {QuestionNote, QuestionNoteMethods, QUESTION_NOTE_LEN};
     use crate::types::answer_note:: {AnswerNote, AnswerNoteMethods, ANSWER_NOTE_LEN};
     use crate::types::fee_note:: {FeeNote, FeeNoteMethods, FEE_NOTE_LEN};
@@ -163,16 +158,9 @@ use dep::aztec::oracle::debug_log::{ debug_log, debug_log_field };
     // Requester submit a question
     #[aztec(private)]
     fn submit_question(from: AztecAddress, question: Field, divinity_address: AztecAddress, nonce: Field) {
-        
-        debug_log("msg sender");
-        debug_log_field(context.msg_sender());
-        debug_log("from");
-        debug_log_field(from.address);
-
         if (from.address != context.msg_sender()) {
             assert_current_call_valid_authwit(&mut context, from);
         }
-
 
         let payment_token = storage.payment_token.get_note().payment_token;
         let fee = storage.fee.get_note().fee;
@@ -180,7 +168,6 @@ use dep::aztec::oracle::debug_log::{ debug_log, debug_log_field };
         let mut escrow_randomness = 0;
 
         if(payment_token.address != 0) {
-        
             // Take the payment from the user
             escrow_randomness = TokenPrivateContextInterface::at(payment_token.address).escrow(
                 &mut context,

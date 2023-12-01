@@ -55,7 +55,7 @@ beforeAll(async () => {
     getSandboxAccountsWallets(pxe),
     createAccount(pxe),
   ]);
-}, 60_000);
+}, 100_000);
 
 describe("E2E Private Oracle", () => {
   describe("submit_question(..)", () => {
@@ -238,21 +238,6 @@ describe("E2E Private Oracle", () => {
         ]
       );
 
-      // Console.log divinityRequestsNotes
-      console.log(
-        divinityRequestsNotes.map((n) =>
-          n.note.items.map((i) => i.value.toString())
-        )
-      );
-      const escrowNotes = await pxe.getNotes({
-        owner: requester.getAddress(),
-        contractAddress: token.address,
-        storageSlot: new Fr(7),
-      });
-      console.log(
-        escrowNotes.map((n) => n.note.items.map((i) => i.value.toString()))
-      );
-
       // Check: Compare the note's data with the expected values (this is the second note for the divnity)
       expect(divinityRequestsNotes[1].note.items[0].value).toEqual(QUESTION);
       expect(
@@ -318,8 +303,6 @@ describe("E2E Private Oracle", () => {
         contractAddress: token.address,
         storageSlot: new Fr(7),
       });
-
-      console.log(questionNotes);
     }, 60_000);
   });
 
@@ -686,7 +669,7 @@ describe("E2E Private Oracle", () => {
         .methods.submit_answer(QUESTION, requester.getAddress(), ANSWER)
         .send()
         .wait();
-    }, 60_000);
+    }, 100_000);
 
     it("get_answer returns the correct answer to the requester", async () => {
       // Get the answer

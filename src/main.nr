@@ -332,14 +332,49 @@ contract PrivateOracle {
         );
     }
 
+    // Return all questions from a given requester that the caller can decrypt (max 10 for now)
+    unconstrained fn get_questions_unconstrained(requester: AztecAddress, start_offset: u32) -> [Option<QuestionNote>; 10] {
+        // MAX_NOTES_PER_PAGE == 10
+        // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
+
+        // create the filter - limiting to 10 for future compatibility
+        let question_getter_option = NoteViewerOptions::new().select(1, requester.address).set_offset(start_offset).set_limit(10);
+
+        // filter the notes and return the answer-
+        storage.questions.view_notes(question_getter_option)
+    }
+
+    // Returns the questions pending to answer for a given divinity
+    unconstrained fn get_pending_questions_unconstrained(divinity: AztecAddress, start_offset: u32) -> [Option<QuestionNote>; 10] {
+        // MAX_NOTES_PER_PAGE == 10
+        // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
+
+        // create the filter - limiting to 10 for future compatibility
+        let question_getter_option = NoteViewerOptions::new().select(2, divinity.address).set_offset(start_offset).set_limit(10);
+
+        // filter the notes and return the answer-
+        storage.questions.view_notes(question_getter_option)
+    }
+
+    // Returns the questions answered owned by a given address
+    unconstrained fn get_answers_unconstrained(owner: AztecAddress, start_offset: u32) -> [Option<AnswerNote>; 10] {
+        // MAX_NOTES_PER_PAGE == 10
+        // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
+
+        // create the filter - limiting to 10 for future compatibility
+        let answer_getter_option = NoteViewerOptions::new().select(4, owner.address).set_offset(start_offset).set_limit(10);
+
+        // filter the notes and return the answer-
+        storage.answers.view_notes(answer_getter_option)
+    }   
+
     // Get the answer to a question - unconstrained. Returns all answers to the same questions, from all the divinities
     // Obviously, only the question from the sender can be read
     unconstrained fn get_answer_unconstrained(question: Field, note_owner: AztecAddress) -> AnswerNote {
-    // MAX_NOTES_PER_PAGE == 10
-    // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
+        // MAX_NOTES_PER_PAGE == 10
+        // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
 
-    //TODO: paginate
-        // create the filter
+        // create the filter - limiting to 10 for future compatibility
         let answer_getter_option = NoteViewerOptions::new().select(0, question).select(4, note_owner.address).set_limit(1);
 
         // filter the notes and return the answer-

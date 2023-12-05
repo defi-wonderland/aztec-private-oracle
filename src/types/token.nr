@@ -4,7 +4,11 @@ use dep::std;
 use dep::aztec::context::{ PrivateContext, PublicContext };
 use dep::aztec::constants_gen::RETURN_VALUES_LENGTH;
 
-struct FromBurnStruct {
+struct AccountBroadcastEscrowNoteForStruct {
+  address: Field,
+}
+
+struct OwnerBroadcastEscrowNoteForStruct {
   address: Field,
 }
 
@@ -16,11 +20,7 @@ struct FromEscrowStruct {
   address: Field,
 }
 
-struct AgentEscrowStruct {
-  address: Field,
-}
-
-struct ParticipantsEscrowStruct {
+struct OwnerEscrowStruct {
   address: Field,
 }
 
@@ -40,7 +40,7 @@ struct MinterSetMinterStruct {
   address: Field,
 }
 
-struct AgentSettleEscrowStruct {
+struct OwnerSettleEscrowStruct {
   address: Field,
 }
 
@@ -89,19 +89,21 @@ impl TokenPrivateContextInterface {
       }
   }
   
-  pub fn burn(
+  pub fn broadcast_escrow_note_for(
     self,
     context: &mut PrivateContext,
-    from: FromBurnStruct,
+    account: AccountBroadcastEscrowNoteForStruct,
+    owner: OwnerBroadcastEscrowNoteForStruct,
     amount: Field,
-    nonce: Field
+    randomness: Field
   ) -> [Field; RETURN_VALUES_LENGTH] {
-    let mut serialized_args = [0; 3];
-    serialized_args[0] = from.address;
-    serialized_args[1] = amount;
-    serialized_args[2] = nonce;
+    let mut serialized_args = [0; 4];
+    serialized_args[0] = account.address;
+    serialized_args[1] = owner.address;
+    serialized_args[2] = amount;
+    serialized_args[3] = randomness;
 
-    context.call_private_function(self.address, 0xd4fcc96e, serialized_args)
+    context.call_private_function(self.address, 0x46b53be6, serialized_args)
   }
   
 
@@ -125,22 +127,17 @@ impl TokenPrivateContextInterface {
     self,
     context: &mut PrivateContext,
     from: FromEscrowStruct,
-    agent: AgentEscrowStruct,
+    owner: OwnerEscrowStruct,
     amount: Field,
-    participants: [ParticipantsEscrowStruct;4],
     nonce: Field
   ) -> [Field; RETURN_VALUES_LENGTH] {
-    let mut serialized_args = [0; 8];
+    let mut serialized_args = [0; 4];
     serialized_args[0] = from.address;
-    serialized_args[1] = agent.address;
+    serialized_args[1] = owner.address;
     serialized_args[2] = amount;
-    serialized_args[3] = participants[0].address;
-    serialized_args[4] = participants[1].address;
-    serialized_args[5] = participants[2].address;
-    serialized_args[6] = participants[3].address;
-    serialized_args[7] = nonce;
+    serialized_args[3] = nonce;
 
-    context.call_private_function(self.address, 0x7c289f70, serialized_args)
+    context.call_private_function(self.address, 0x54f7b220, serialized_args)
   }
   
 
@@ -217,14 +214,14 @@ impl TokenPrivateContextInterface {
   pub fn settle_escrow(
     self,
     context: &mut PrivateContext,
-    agent: AgentSettleEscrowStruct,
+    owner: OwnerSettleEscrowStruct,
     recipient: RecipientSettleEscrowStruct,
     amount: Field,
     randomness: Field,
     nonce: Field
   ) -> [Field; RETURN_VALUES_LENGTH] {
     let mut serialized_args = [0; 5];
-    serialized_args[0] = agent.address;
+    serialized_args[0] = owner.address;
     serialized_args[1] = recipient.address;
     serialized_args[2] = amount;
     serialized_args[3] = randomness;

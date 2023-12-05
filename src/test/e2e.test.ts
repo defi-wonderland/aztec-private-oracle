@@ -1116,7 +1116,6 @@ const createAuthEscrowMessage = async (
   token: TokenContract,
   from: AccountWalletWithPrivateKey,
   agent: AztecAddress,
-  participants: AztecAddress[],
   amount: any
 ) => {
   const nonce = Fr.random();
@@ -1126,7 +1125,6 @@ const createAuthEscrowMessage = async (
     from.getAddress(),
     agent,
     amount,
-    participants,
     nonce
   );
   const messageHash = await computeAuthWitMessageHash(agent, action.request());

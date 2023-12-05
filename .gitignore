@@ -4,7 +4,7 @@ yarn-error.log
 
 # build
 target/
-types/
+types/PrivateOracle.ts
 !src/types/
 
 # MacOS frens:

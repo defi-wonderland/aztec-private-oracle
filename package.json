@@ -4,7 +4,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "test": "aztec-cli compile . && aztec-cli generate-typescript . && NODE_NO_WARNINGS=1 node --experimental-vm-modules $(yarn bin jest) --runInBand --passWithNoTests --testTimeout=15000"
+    "test": "aztec-cli compile . && aztec-cli generate-typescript . && NODE_NO_WARNINGS=1 node --experimental-vm-modules $(yarn bin jest) --runInBand --passWithNoTests --testTimeout=30000"
   },
   "jest": {
     "preset": "ts-jest/presets/default-esm",

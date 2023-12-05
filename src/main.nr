@@ -37,6 +37,7 @@ Answer:
 mod types;
  
 contract PrivateOracle {
+    
     use crate::types::question_note:: {QuestionNote, QuestionNoteMethods, QUESTION_NOTE_LEN};
     use crate::types::answer_note:: {AnswerNote, AnswerNoteMethods, ANSWER_NOTE_LEN};
     use crate::types::fee_note:: {FeeNote, FeeNoteMethods, FEE_NOTE_LEN};
@@ -83,6 +84,12 @@ contract PrivateOracle {
     use dep::aztec::types::type_serialization::aztec_address_serialization::{AztecAddressSerializationMethods, AZTEC_ADDRESS_SERIALIZED_LEN};
     
     use dep::aztec::types::address::AztecAddress;
+
+    use dep::authwit::{
+        auth::{
+            assert_current_call_valid_authwit,  
+        },
+    };
 
     global PAYMENT_TOKEN_SLOT = 1;
     global FEE_SLOT = 2;
@@ -151,43 +158,55 @@ contract PrivateOracle {
 
     // Requester submit a question
     #[aztec(private)]
-    fn submit_question(question: Field, divinity_address: AztecAddress, nonce: Field) {
+    fn submit_question(from: AztecAddress, question: Field, divinity_address: AztecAddress, nonce: Field) {
+        if (from.address != context.msg_sender()) {
+            assert_current_call_valid_authwit(&mut context, from);
+        }
+
         let payment_token = storage.payment_token.get_note().payment_token;
         let fee = storage.fee.get_note().fee;
         let address_this = AztecAddress::new(context.this_address());
-        let sender = AztecAddress::new(context.msg_sender());
+        let mut escrow_randomness = 0;
 
-        let token_contract = TokenPrivateContextInterface::at(payment_token.address);
+ 
 
-        // Take the payment from the user
-        let escrow_randomness = token_contract.escrow(
-            &mut context,
-            FromEscrowStruct { address: sender.address },
-            OwnerEscrowStruct { address: address_this.address },
-            fee,
-            nonce
-        )[0];
+        if(payment_token.address != 0) {
 
-        // Broadcast the escrow to the user
-        let _ = token_contract.broadcast_escrow_note_for(
-            &mut context,
-            AccountBroadcastEscrowNoteForStruct { address: sender.address },
-            OwnerBroadcastEscrowNoteForStruct { address: address_this.address },
-            fee,
-            escrow_randomness
-        );
+            let token_contract = TokenPrivateContextInterface::at(payment_token.address);
 
-        // Broadcast the escrow to the divinity
-        let _ = token_contract.broadcast_escrow_note_for(
-            &mut context,
-            AccountBroadcastEscrowNoteForStruct { address: divinity_address.address },
-            OwnerBroadcastEscrowNoteForStruct { address: address_this.address },
-            fee,
-            escrow_randomness
-        );
+            // Take the payment from the user
+            escrow_randomness = token_contract.escrow(
+                &mut context,
+                FromEscrowStruct { address: from.address },
+                OwnerEscrowStruct { address: address_this.address },
+                fee,
+                nonce
+            )[0];
+
+            // Broadcast the escrow to the user
+            let _ = token_contract.broadcast_escrow_note_for(
+                &mut context,
+                AccountBroadcastEscrowNoteForStruct { address: from.address },
+                OwnerBroadcastEscrowNoteForStruct { address: address_this.address },
+                fee,
+                escrow_randomness
+            );
+
+            // Broadcast the escrow to the divinity
+            let _ = token_contract.broadcast_escrow_note_for(
+                &mut context,
+                AccountBroadcastEscrowNoteForStruct { address: divinity_address.address },
+                OwnerBroadcastEscrowNoteForStruct { address: address_this.address },
+                fee,
+                escrow_randomness
+            );
+
+        } else {
+            assert(false, "Payment token not set");
+        }
 
         // Assert if question doesn't already exist from the same requester
-        let question_getter_option = NoteGetterOptions::new().select(0, question).select(1, sender.address).set_limit(1);
+        let question_getter_option = NoteGetterOptions::new().select(0, question).select(1, from.address).set_limit(1);
         let question_note = storage.questions.get_notes(question_getter_option)[0];
 
         assert(question_note.is_none());
@@ -197,7 +216,7 @@ contract PrivateOracle {
 
         let mut new_question: QuestionNote = QuestionNote::new(
             question,
-            sender, 
+            from, 
             divinity_address,
             random_nullifier_shared_key,
             escrow_randomness

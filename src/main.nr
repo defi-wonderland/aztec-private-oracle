@@ -53,6 +53,9 @@ contract PrivateOracle {
         RecipientSettleEscrowStruct,
         AgentSettleEscrowStruct
     };
+    use crate::types::callback::{
+        PrivateOracleCallbackInterface
+    };
 
     use dep::std::option::Option;
 
@@ -150,7 +153,7 @@ contract PrivateOracle {
 
     // Requester submit a question
     #[aztec(private)]
-    fn submit_question(question: Field, divinity_address: AztecAddress, callback: [Field; 3], nonce: Field) {
+    fn submit_question(question: Field, divinity_address: AztecAddress, callback: [Field; 6], nonce: Field) {
         let payment_token = storage.payment_token.get_note().payment_token;
         let fee = storage.fee.get_note().fee;
         let address_this = AztecAddress::new(context.this_address());
@@ -273,6 +276,16 @@ contract PrivateOracle {
         storage.answers.insert(&mut new_answer_note_for_requester, true);
 
         let escrow_randomness = request.unwrap_unchecked().escrow_randomness;
+
+        let callback = request.unwrap_unchecked().callback;
+
+        // Is there a callback address?
+        if(callback[0] != 0) {
+            let _ = PrivateOracleCallbackInterface::at(callback[0]).trigger_callback(
+                &mut context,
+                callback,
+                answer);
+        }
 
         // Nullify the question note (will nullify both divinity and requester notes, via the shared key)
         storage.questions.remove(request.unwrap_unchecked());

@@ -150,7 +150,7 @@ contract PrivateOracle {
 
     // Requester submit a question
     #[aztec(private)]
-    fn submit_question(question: Field, divinity_address: AztecAddress, nonce: Field) {
+    fn submit_question(question: Field, divinity_address: AztecAddress, callback: [Field; 3], nonce: Field) {
         let payment_token = storage.payment_token.get_note().payment_token;
         let fee = storage.fee.get_note().fee;
         let address_this = AztecAddress::new(context.this_address());
@@ -185,7 +185,8 @@ contract PrivateOracle {
             sender, 
             divinity_address,
             random_nullifier_shared_key,
-            escrow_randomness
+            escrow_randomness,
+            callback
         );
 
         // Commit the note in the data tree and send to requester
@@ -392,7 +393,7 @@ contract PrivateOracle {
     }
 
     // Computes note hash and nullifier.
-    unconstrained fn compute_note_hash_and_nullifier(contract_address: Field, nonce: Field, storage_slot: Field, preimage: [Field; ANSWER_NOTE_LEN]) -> [Field; 4] {
+    unconstrained fn compute_note_hash_and_nullifier(contract_address: Field, nonce: Field, storage_slot: Field, preimage: [Field; QUESTION_NOTE_LEN]) -> [Field; 4] {
         let note_header = NoteHeader::new(contract_address, nonce, storage_slot);
 
         if(storage_slot == PAYMENT_TOKEN_SLOT) {

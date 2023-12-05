@@ -29,17 +29,19 @@ struct QuestionNote {
     divinity_address: AztecAddress,
     shared_nullifier_key: Field,
     escrow_randomness: Field,
+    callback: [Field; 3],
     header: NoteHeader
 }
 
-global QUESTION_NOTE_LEN: Field = 5;
+global QUESTION_NOTE_LEN: Field = 8;
 
 impl QuestionNote {
     pub fn new( _request: Field,
             _requesterAddress: AztecAddress,
             _divinityAddress: AztecAddress,
             _sharedNullifierKey: Field,
-            _escrowRandomness: Field
+            _escrowRandomness: Field,
+            _callback: [Field; 3]
         ) -> Self {
 
         QuestionNote {
@@ -48,13 +50,14 @@ impl QuestionNote {
             divinity_address: _divinityAddress,
             shared_nullifier_key: _sharedNullifierKey,
             escrow_randomness: _escrowRandomness,
+            callback: _callback,
             header: NoteHeader::empty(),
         }
 
     }
 
     fn serialize(self) -> [Field; QUESTION_NOTE_LEN] {
-        [self.request, self.requester_address.address, self.divinity_address.address, self.shared_nullifier_key, self.escrow_randomness]
+        [self.request, self.requester_address.address, self.divinity_address.address, self.shared_nullifier_key, self.escrow_randomness, self.callback[0], self.callback[1], self.callback[2]]
     }
 
     fn deserialize(preimage: [Field; QUESTION_NOTE_LEN]) -> Self {
@@ -64,6 +67,7 @@ impl QuestionNote {
             divinity_address: AztecAddress::new(preimage[2]),
             shared_nullifier_key: preimage[3], 
             escrow_randomness: preimage[4],
+            callback: [preimage[5], preimage[6], preimage[7]],
             header: NoteHeader::empty(),
         }
     }

@@ -33,7 +33,7 @@ impl PrivateOracleCallbackInterface {
     serialized_args[5] = answer;
 
     // Calling the oracle_callback fn:  "oracle_callback(data: [Field; 5], answer: Field)"
-    context.call_private_function(self.address, 0xbb88729f, serialized_args)
+    context.call_private_function(self.address, 0xc7f6658c, serialized_args)
   }
 }
   

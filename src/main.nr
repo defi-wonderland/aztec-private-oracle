@@ -221,7 +221,7 @@ contract PrivateOracle {
             .set_limit(1);
         
         // Get the question note
-        let request = storage.questions.get_notes(request_filter)[0];
+        let mut request = storage.questions.get_notes(request_filter)[0];
 
         // Check if the question exists
         assert(!request.is_none());
@@ -277,14 +277,20 @@ contract PrivateOracle {
 
         let escrow_randomness = request.unwrap_unchecked().escrow_randomness;
 
-        let callback = request.unwrap_unchecked().callback;
+        request = storage.questions.get_notes(request_filter)[0];
 
         // Is there a callback address?
-        if(callback[0] != 0) {
-            let _ = PrivateOracleCallbackInterface::at(callback[0]).trigger_callback(
-                &mut context,
-                callback,
-                answer);
+        if(request.is_some()) {
+
+            let callback = request.unwrap_unchecked().callback;
+            let _target = AztecAddress::new(callback[0]);
+
+            if(_target.address != 0) {
+                let _ = PrivateOracleCallbackInterface::at(_target.address).trigger_callback(
+                    &mut context,
+                    callback,
+                    answer);
+            }
         }
 
         // Nullify the question note (will nullify both divinity and requester notes, via the shared key)

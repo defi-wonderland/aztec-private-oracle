@@ -38,6 +38,8 @@ const MINT_AMOUNT = 100000000n;
 
 const ADDRESS_ZERO = AztecAddress.fromBigInt(0n);
 
+const EMPTY_CALLBACK = [0n, 0n, 0n, 0n, 0n, 0n];
+
 let pxe: PXE;
 let oracle: PrivateOracleContract;
 let token: TokenContract;
@@ -131,7 +133,8 @@ describe("E2E Private Oracle", () => {
         .methods.submit_question(
           QUESTION_NOTE.request,
           divinity.getAddress(),
-          nonce
+          nonce,
+          EMPTY_CALLBACK
         )
         .send()
         .wait();
@@ -170,6 +173,7 @@ describe("E2E Private Oracle", () => {
         request: QUESTION_NOTE.request,
         requester: QUESTION_NOTE.requester,
         divinity: QUESTION_NOTE.divinity,
+        callback: QUESTION_NOTE.callback,
       };
 
       expect(question).toEqual(
@@ -204,6 +208,7 @@ describe("E2E Private Oracle", () => {
         request: QUESTION_NOTE.request,
         requester: QUESTION_NOTE.requester,
         divinity: QUESTION_NOTE.divinity,
+        callback: QUESTION_NOTE.callback,
       };
 
       expect(question).toEqual(
@@ -246,7 +251,8 @@ describe("E2E Private Oracle", () => {
         .methods.submit_question(
           QUESTION_NOTE.request,
           divinity.getAddress(),
-          nonce
+          nonce,
+          EMPTY_CALLBACK
         )
         .send()
         .wait();
@@ -273,6 +279,7 @@ describe("E2E Private Oracle", () => {
         request: QUESTION_NOTE.request,
         requester: QUESTION_NOTE.requester,
         divinity: QUESTION_NOTE.divinity,
+        callback: QUESTION_NOTE.callback,
       };
 
       // Remove duplicates (by default, return all notes from all wallets in the pxe) and empty notes
@@ -354,7 +361,8 @@ describe("E2E Private Oracle", () => {
         .methods.submit_question(
           QUESTION_NOTE.request,
           divinity.getAddress(),
-          nonce
+          nonce,
+          EMPTY_CALLBACK
         )
         .send()
         .wait();
@@ -488,7 +496,12 @@ describe("E2E Private Oracle", () => {
       // Setup: submit the same question from a second requester
       await oracle
         .withWallet(requester2)
-        .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
+        .methods.submit_question(
+          QUESTION,
+          divinity.getAddress(),
+          nonce,
+          EMPTY_CALLBACK
+        )
         .send()
         .wait();
 
@@ -563,7 +576,12 @@ describe("E2E Private Oracle", () => {
       // Submit a question
       await oracle
         .withWallet(requester)
-        .methods.submit_question(QUESTION, divinity.getAddress(), nonce)
+        .methods.submit_question(
+          QUESTION,
+          divinity.getAddress(),
+          nonce,
+          EMPTY_CALLBACK
+        )
         .send()
         .wait();
     }, 100_000);
@@ -675,6 +693,7 @@ describe("E2E Private Oracle", () => {
               request: questionNote.request,
               requester: questionNote.requester,
               divinity: questionNote.divinity,
+              callback: questionNote.callback,
             };
 
             return expect.objectContaining(noteWithoutNullifier);
@@ -708,6 +727,7 @@ describe("E2E Private Oracle", () => {
               request: questionNote.request,
               requester: questionNote.requester,
               divinity: questionNote.divinity,
+              callback: questionNote.callback,
             };
 
             return expect.objectContaining(noteWithoutNullifier);
@@ -763,6 +783,7 @@ describe("E2E Private Oracle", () => {
               request: questionNote.request,
               requester: questionNote.requester,
               divinity: questionNote.divinity,
+              callback: questionNote.callback,
             };
 
             return expect.objectContaining(noteWithoutNullifier);
@@ -838,6 +859,7 @@ describe("E2E Private Oracle", () => {
               request: questionNote.request,
               requester: questionNote.requester,
               divinity: questionNote.divinity,
+              callback: questionNote.callback,
             };
 
             return expect.objectContaining(noteWithoutNullifier);
@@ -874,6 +896,7 @@ describe("E2E Private Oracle", () => {
               request: questionNote.request,
               requester: questionNote.requester,
               divinity: questionNote.divinity,
+              callback: questionNote.callback,
             };
 
             return expect.objectContaining(noteWithoutNullifier);
@@ -1237,7 +1260,12 @@ const sendQuestionsBatch = async (questionNotes: QuestionNote[]) => {
     requester,
     questionNotes.map((questionNote, i) =>
       oracle.methods
-        .submit_question(questionNote.request, divinity.getAddress(), nonces[i])
+        .submit_question(
+          questionNote.request,
+          divinity.getAddress(),
+          nonces[i],
+          EMPTY_CALLBACK
+        )
         .request()
     )
   );

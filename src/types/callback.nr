@@ -19,21 +19,21 @@ impl PrivateOracleCallbackInterface {
   pub fn trigger_callback(
     self,
     context: &mut PrivateContext,
-    data: [Field; 6],
-    answer: Field
+    answer: Field,
+    data: [Field; 6]
   ) -> [Field; RETURN_VALUES_LENGTH] {
     let mut serialized_args = [0; 6];
 
     // drop the first data element, which is the address (already in self.address)
-    serialized_args[0] = data[1];
-    serialized_args[1] = data[2];
-    serialized_args[2] = data[3];
-    serialized_args[3] = data[4];
-    serialized_args[4] = data[5];
-    serialized_args[5] = answer;
+    serialized_args[0] = answer;
+    serialized_args[1] = data[1];
+    serialized_args[2] = data[2];
+    serialized_args[3] = data[3];
+    serialized_args[4] = data[4];
+    serialized_args[5] = data[5];
 
-    // Calling the oracle_callback fn:  "oracle_callback(data: [Field; 5], answer: Field)"
-    context.call_private_function(self.address, 0xc7f6658c, serialized_args)
+    // Calling the oracle_callback fn:  "oracle_callback(answer: Field, data: [Field; 5])"
+    context.call_private_function(self.address, 0x8853c9d8, serialized_args)
   }
 }
   

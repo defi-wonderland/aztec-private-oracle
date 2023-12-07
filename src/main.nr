@@ -37,6 +37,11 @@ Answer:
 mod types;
  
 contract PrivateOracle {
+
+    /// DEBUG
+    use dep::aztec::oracle::debug_log::{ debug_log, debug_log_field, debug_log_format };
+    /// DEBUG
+
     use crate::types::question_note:: {QuestionNote, QuestionNoteMethods, QUESTION_NOTE_LEN};
     use crate::types::answer_note:: {AnswerNote, AnswerNoteMethods, ANSWER_NOTE_LEN};
     use crate::types::fee_note:: {FeeNote, FeeNoteMethods, FEE_NOTE_LEN};
@@ -153,7 +158,7 @@ contract PrivateOracle {
 
     // Requester submit a question
     #[aztec(private)]
-    fn submit_question(question: Field, divinity_address: AztecAddress, callback: [Field; 6], nonce: Field) {
+    fn submit_question(question: Field, divinity_address: AztecAddress, nonce: Field, callback: [Field; 6]) {
         let payment_token = storage.payment_token.get_note().payment_token;
         let fee = storage.fee.get_note().fee;
         let address_this = AztecAddress::new(context.this_address());
@@ -269,7 +274,7 @@ contract PrivateOracle {
                 divinity_calling,
                 divinity_calling
             );
-        }
+        } 
 
         // Commit and send both notes
         storage.answers.insert(&mut new_answer_note_for_divinity, true);
@@ -277,21 +282,17 @@ contract PrivateOracle {
 
         let escrow_randomness = request.unwrap_unchecked().escrow_randomness;
 
-        request = storage.questions.get_notes(request_filter)[0];
-
         // Is there a callback address?
-        if(request.is_some()) {
+        let callback = request.unwrap_unchecked().callback;
 
-            let callback = request.unwrap_unchecked().callback;
-            let _target = AztecAddress::new(callback[0]);
+        let mut _target = callback[0];
 
-            if(_target.address != 0) {
-                let _ = PrivateOracleCallbackInterface::at(_target.address).trigger_callback(
-                    &mut context,
-                    callback,
-                    answer);
-            }
-        }
+        if(_target == 0) { _target = address_this.address; }
+
+        let _ = PrivateOracleCallbackInterface::at(_target).trigger_callback(
+            &mut context,
+            answer,
+            callback); 
 
         // Nullify the question note (will nullify both divinity and requester notes, via the shared key)
         storage.questions.remove(request.unwrap_unchecked());
@@ -350,6 +351,13 @@ contract PrivateOracle {
             escrow_randomness,
             0
         );
+    }
+
+    #[aztec(private)]
+    fn oracle_callback(answer: Field, data: [Field; 5]) -> Field {
+        // Do nothing and avoid warning
+        assert(data==data);
+        assert(answer==answer);
     }
 
     // Return all questions from a given requester that the caller can decrypt (max 10 for now)

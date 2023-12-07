@@ -41,12 +41,20 @@ export class QuestionNote {
   requester: AztecAddress;
   divinity: AztecAddress;
   shared_nullifier_key: bigint;
+  callback: bigint[];
 
-  constructor(request: bigint, requester: AztecAddress, divinity: AztecAddress, shared_nullifier_key: bigint) {
+  constructor(
+    request: bigint,
+    requester: AztecAddress,
+    divinity: AztecAddress,
+    shared_nullifier_key: bigint,
+    callback: bigint[]
+  ) {
     this.request = request;
     this.requester = requester;
     this.divinity = divinity;
     this.shared_nullifier_key = shared_nullifier_key;
+    this.callback = callback;
   }
 
   static fromChainData(note: any) {
@@ -55,6 +63,7 @@ export class QuestionNote {
       AztecAddress.fromBigInt(note.requester_address.address),
       AztecAddress.fromBigInt(note.divinity_address.address),
       note.shared_nullifier_key,
+      (note.callback = [])
     );
   }
 
@@ -64,6 +73,7 @@ export class QuestionNote {
       AztecAddress.fromBigInt(note.requester_address.asBigInt),
       AztecAddress.fromBigInt(note.divinity_address.asBigInt),
       note.shared_nullifier_key,
+      (note.callback = [])
     );
   }
 }

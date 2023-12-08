@@ -19,6 +19,7 @@ import { TokenContract } from "../token/Token.js";
 
 import { PrivateOracleContract } from "../../types/PrivateOracle.js";
 import { AnswerNote, QuestionNote } from "../../types/Notes.js";
+import { initAztecJs } from "@aztec/aztec.js/init";
 
 const {
   SANDBOX_URL = "http://localhost:8080",
@@ -53,6 +54,8 @@ let deployer: AccountWalletWithPrivateKey;
 beforeAll(async () => {
   const { SANDBOX_URL = "http://localhost:8080" } = process.env;
   pxe = createPXEClient(SANDBOX_URL);
+
+  await initAztecJs();
 
   [, [requester, requester2, divinity], deployer] = await Promise.all([
     waitForSandbox(pxe),

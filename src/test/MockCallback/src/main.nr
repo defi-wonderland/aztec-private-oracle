@@ -1,5 +1,5 @@
 contract MockOracleCallback {
-    use dep::aztec::types::type_serialization::bool_serialization::{ BoolSerializationMethods, BOOL_SERIALIZED_LEN};
+    use dep::aztec::types::type_serialization::{ TypeSerializationInterface};
 
     use dep::aztec::{
         context::{PrivateContext, PublicContext, Context},
@@ -8,18 +8,69 @@ contract MockOracleCallback {
 
     use dep::aztec::oracle::debug_log::{ debug_log, debug_log_field, debug_log_format };
 
+    global CALLBACK_DATA_LENGTH = 6;
+
+    struct Callback_Data {
+        answer: Field,
+        data: [Field; 5],
+    }
+
+    impl Callback_Data {
+        pub fn new(answer: Field, data: [Field; 5]) -> Self {
+            Callback_Data {
+                answer,
+                data,
+            }
+        }
+
+        fn deserialize_callback_data(preimage: [Field; CALLBACK_DATA_LENGTH]) -> Self {
+            Callback_Data {
+                answer: preimage[0],
+                data: [preimage[1], preimage[2], preimage[3], preimage[4], preimage[5]]
+            }
+        }
+
+        fn serialize_callback_data(self) -> [Field; CALLBACK_DATA_LENGTH] {
+            [
+                self.answer,
+                self.data[0],
+                self.data[1],
+                self.data[2],
+                self.data[3],
+                self.data[4],
+            ]
+        }
+    }
+
+    fn serialize_callback_data(callback_data: Callback_Data) -> pub [Field; CALLBACK_DATA_LENGTH] {
+        callback_data.serialize_callback_data()
+    }
+
+    fn deserialize_callback_data(preimage: [Field; CALLBACK_DATA_LENGTH]) -> pub Callback_Data {
+        Callback_Data::deserialize_callback_data(preimage)
+    }
+
+    global CallbackDataSerializationMethods = TypeSerializationInterface {
+        serialize: serialize_callback_data,
+        deserialize: deserialize_callback_data,
+    };
 
     struct Storage {
-        has_been_called: PublicState<bool, BOOL_SERIALIZED_LEN>,
+        data_received: PublicState<Callback_Data, CALLBACK_DATA_LENGTH>,
     }
 
     impl Storage {
         fn init(context: Context) -> Self {
             Storage {
                 // -- Public --
-                has_been_called: PublicState::new(context, 1, BoolSerializationMethods),
+                data_received: PublicState::new(context, 1, CallbackDataSerializationMethods),
             }
         }
+    }
+
+    #[aztec(private)]
+    constructor() {
+       _;
     }
 
     #[aztec(private)]
@@ -27,11 +78,29 @@ contract MockOracleCallback {
         // Do nothing and avoid warning
         assert(data==data);
         assert(answer==answer);
+        
         debug_log("Oracle callback called");
-        storage.has_been_called.write(true);
+        debug_log_field(answer);
+        debug_log_format("Data: %x %x %x %x %x", [data[0], data[1], data[2], data[3], data[4]]);
+
+        // Intentional public leak
+        context.call_public_function(
+            context.this_address(), 
+            compute_selector("write_received_data(Field,[Field; 5])"), 
+            [answer, data]);
+    }
+
+    #[aztec(public)]
+    fn write_received_data(answer: Field, data: [Field; 5]) {
+        storage.data_received.write(Callback_Data::new(answer, data));
+    }
+
+    #[aztec(public)]
+    unconstrained fn get_received_data() -> Callback_Data {) {
+        storage.data_received.read()
     }
 
     unconstrained fn compute_note_hash_and_nullifier(contract_address: Field, nonce: Field, storage_slot: Field, serialized_note: [Field; 0]) -> [Field; 4] {
-        [0, 0, 0, 0]
+        [0,0,0,0]
     }
 }

@@ -16,6 +16,7 @@ import {
 } from "@aztec/aztec.js";
 
 import { TokenContract } from "../token/Token.js";
+import { MockOracleCallbackContract } from "./MockCallback/interfaces/MockOracleCallback.js";
 
 import { PrivateOracleContract } from "../../types/PrivateOracle.js";
 import { AnswerNote, QuestionNote } from "../../types/Notes.js";
@@ -45,6 +46,8 @@ let pxe: PXE;
 let oracle: PrivateOracleContract;
 let token: TokenContract;
 
+let mockCallback: MockOracleCallbackContract;
+
 let requester: AccountWalletWithPrivateKey;
 let requester2: AccountWalletWithPrivateKey;
 let divinity: AccountWalletWithPrivateKey;
@@ -65,7 +68,7 @@ beforeAll(async () => {
 }, 120_000);
 
 describe("E2E Private Oracle", () => {
-  describe("submit_question(..)", () => {
+  describe.only("submit_question(..)", () => {
     // global scoped to assert accross 'it' blocks
     let shared_key_nullifier_divinity: bigint;
     let shared_key_nullifier_requester: bigint;
@@ -304,6 +307,63 @@ describe("E2E Private Oracle", () => {
         matches[1].shared_nullifier_key
       );
     }, 120_000);
+
+    // Test: if a callback is provided, it is correctly stored
+    it("callback is correctly stored", async () => {
+      // Deploy the contract receiving the callback
+      mockCallback = await MockOracleCallbackContract.deploy(deployer)
+        .send()
+        .deployed();
+
+      const nonce = await createAuthEscrowMessage(
+        token,
+        requester,
+        oracle.address,
+        [
+          requester.getAddress(),
+          divinity.getAddress(),
+          ADDRESS_ZERO,
+          ADDRESS_ZERO,
+        ],
+        FEE
+      );
+
+      // Submit the question
+      const receipt = await oracle
+        .withWallet(requester)
+        .methods.submit_question(
+          QUESTION_NOTE.request + 69n,
+          divinity.getAddress(),
+          nonce,
+          [mockCallback.address.toBigInt(), 69n, 69n, 69n, 69n, 69n]
+        )
+        .send()
+        .wait();
+
+      expect(receipt.status).toBe("mined");
+
+      // Check: is the callback correctly stored?
+      const question: QuestionNote = (
+        await oracle
+          .withWallet(requester)
+          .methods.get_pending_questions_unconstrained(
+            divinity.getAddress(),
+            0n
+          )
+          .view({ from: requester.getAddress() })
+      )
+        .map((questionNote: any) => questionNote._value)
+        .map((x: QuestionNote) => QuestionNote.fromChainData(x))[0]; // returns 10 by default
+
+      expect(question.callback).toEqual([
+        mockCallback.address.toBigInt(),
+        69n,
+        69n,
+        69n,
+        69n,
+        69n,
+      ]);
+    });
   });
 
   describe("submit_answer(..)", () => {

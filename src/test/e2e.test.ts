@@ -803,7 +803,7 @@ describe("E2E Private Oracle", () => {
       // Match on the 3 deterministic fields of each note (ie drop the random shared key nullifier)
       type QuestionNoteWithoutRandom = Omit<
         QuestionNote,
-        "shared_nullifier_key"
+        "shared_nullifier_key" | "callback"
       >;
 
       expect(questions).toEqual(
@@ -813,7 +813,6 @@ describe("E2E Private Oracle", () => {
               request: questionNote.request,
               requester: questionNote.requester,
               divinity: questionNote.divinity,
-              callback: questionNote.callback,
             };
 
             return expect.objectContaining(noteWithoutNullifier);
@@ -837,7 +836,7 @@ describe("E2E Private Oracle", () => {
       // Match on the 3 deterministic fields of each note (ie drop the random shared key nullifier)
       type QuestionNoteWithoutRandom = Omit<
         QuestionNote,
-        "shared_nullifier_key"
+        "shared_nullifier_key" | "callback"
       >;
 
       expect(questions).toEqual(
@@ -847,7 +846,6 @@ describe("E2E Private Oracle", () => {
               request: questionNote.request,
               requester: questionNote.requester,
               divinity: questionNote.divinity,
-              callback: questionNote.callback,
             };
 
             return expect.objectContaining(noteWithoutNullifier);
@@ -969,7 +967,7 @@ describe("E2E Private Oracle", () => {
       // Match on the 3 deterministic fields of each note (ie drop the random shared key nullifier)
       type QuestionNoteWithoutRandom = Omit<
         QuestionNote,
-        "shared_nullifier_key"
+        "shared_nullifier_key" | "callback"
       >;
 
       expect(questions).toEqual(
@@ -979,7 +977,6 @@ describe("E2E Private Oracle", () => {
               request: questionNote.request,
               requester: questionNote.requester,
               divinity: questionNote.divinity,
-              callback: questionNote.callback,
             };
 
             return expect.objectContaining(noteWithoutNullifier);
@@ -1006,7 +1003,7 @@ describe("E2E Private Oracle", () => {
       // Match on the 3 deterministic fields of each note (ie drop the random shared key nullifier)
       type QuestionNoteWithoutRandom = Omit<
         QuestionNote,
-        "shared_nullifier_key"
+        "shared_nullifier_key" | "callback"
       >;
 
       expect(questions).toEqual(
@@ -1016,7 +1013,6 @@ describe("E2E Private Oracle", () => {
               request: questionNote.request,
               requester: questionNote.requester,
               divinity: questionNote.divinity,
-              callback: questionNote.callback,
             };
 
             return expect.objectContaining(noteWithoutNullifier);

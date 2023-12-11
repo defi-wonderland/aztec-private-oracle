@@ -125,18 +125,13 @@ describe("E2E Private Oracle", () => {
         token,
         requester,
         oracle.address,
-        [
-          requester.getAddress(),
-          divinity.getAddress(),
-          ADDRESS_ZERO,
-          ADDRESS_ZERO,
-        ],
         FEE
       );
       // Submit the question
       const receipt = await oracle
         .withWallet(requester)
         .methods.submit_question(
+          requester.getAddress(),
           QUESTION_NOTE.request,
           divinity.getAddress(),
           nonce,
@@ -237,12 +232,6 @@ describe("E2E Private Oracle", () => {
         token,
         requester2,
         oracle.address,
-        [
-          requester2.getAddress(),
-          divinity.getAddress(),
-          ADDRESS_ZERO,
-          ADDRESS_ZERO,
-        ],
         FEE
       );
 
@@ -253,6 +242,7 @@ describe("E2E Private Oracle", () => {
       await oracle
         .withWallet(requester2)
         .methods.submit_question(
+          requester2.getAddress(),
           QUESTION_NOTE.request,
           divinity.getAddress(),
           nonce,
@@ -304,6 +294,39 @@ describe("E2E Private Oracle", () => {
       expect(matches[0].shared_nullifier_key).not.toEqual(
         matches[1].shared_nullifier_key
       );
+    }, 60_000);
+
+    it("question can be submitted by a third party", async () => {
+      // requester = sender, executes it
+      // requester2 = from, on their behalf
+      const question = new Fr(300n);
+      const nonce = await createAuthEscrowMessage(
+        token,
+        requester2,
+        oracle.address,
+        FEE
+      );
+
+      // Mint tokens for the requester
+      await mintTokenFor(requester2, requester, MINT_AMOUNT);
+
+      const action = await createAuthSubmitQuestionMessage(
+        oracle,
+        requester,
+        requester2,
+        question,
+        divinity.getAddress(),
+        nonce
+      );
+
+      // Submit the question
+      await action.send().wait();
+
+      const questionNotes = await pxe.getNotes({
+        owner: requester2.getAddress(),
+        contractAddress: token.address,
+        storageSlot: new Fr(7),
+      });
     }, 120_000);
 
     // Test: if a callback is provided, it is correctly stored
@@ -414,12 +437,6 @@ describe("E2E Private Oracle", () => {
         token,
         requester,
         oracle.address,
-        [
-          requester.getAddress(),
-          divinity.getAddress(),
-          ADDRESS_ZERO,
-          ADDRESS_ZERO,
-        ],
         FEE
       );
 
@@ -427,6 +444,7 @@ describe("E2E Private Oracle", () => {
       await oracle
         .withWallet(requester)
         .methods.submit_question(
+          requester.getAddress(),
           QUESTION_NOTE.request,
           divinity.getAddress(),
           nonce,
@@ -549,12 +567,6 @@ describe("E2E Private Oracle", () => {
         token,
         requester2,
         oracle.address,
-        [
-          requester2.getAddress(),
-          divinity.getAddress(),
-          ADDRESS_ZERO,
-          ADDRESS_ZERO,
-        ],
         FEE
       );
 
@@ -565,6 +577,7 @@ describe("E2E Private Oracle", () => {
       await oracle
         .withWallet(requester2)
         .methods.submit_question(
+          requester2.getAddress(),
           QUESTION,
           divinity.getAddress(),
           nonce,
@@ -690,12 +703,6 @@ describe("E2E Private Oracle", () => {
         token,
         requester,
         oracle.address,
-        [
-          requester.getAddress(),
-          divinity.getAddress(),
-          ADDRESS_ZERO,
-          ADDRESS_ZERO,
-        ],
         FEE
       );
 
@@ -703,6 +710,7 @@ describe("E2E Private Oracle", () => {
       await oracle
         .withWallet(requester)
         .methods.submit_question(
+          requester.getAddress(),
           QUESTION,
           divinity.getAddress(),
           nonce,
@@ -1086,7 +1094,7 @@ describe("E2E Private Oracle", () => {
 
       // Submit the answers
       await sendAnswersBatch(ANSWER_NOTE_REQUESTER);
-    }, 120_000);
+    }, 160_000);
 
     it("get_answers returns the correct answers to the requester", async () => {
       // get the answers
@@ -1265,7 +1273,6 @@ const createAuthEscrowMessage = async (
   token: TokenContract,
   from: AccountWalletWithPrivateKey,
   agent: AztecAddress,
-  participants: AztecAddress[],
   amount: any
 ) => {
   const nonce = Fr.random();
@@ -1275,7 +1282,6 @@ const createAuthEscrowMessage = async (
     from.getAddress(),
     agent,
     amount,
-    participants,
     nonce
   );
   const messageHash = await computeAuthWitMessageHash(agent, action.request());
@@ -1287,6 +1293,36 @@ const createAuthEscrowMessage = async (
   await from.addAuthWitness(witness);
   return nonce;
 };
+
+const createAuthSubmitQuestionMessage = async (
+  oracle: PrivateOracleContract,
+  sender: AccountWalletWithPrivateKey,
+  from: AccountWalletWithPrivateKey,
+  question: Fr,
+  divinity: AztecAddress,
+  nonce: Fr
+) => {
+  // from: AztecAddress, question: Field, divinity_address: AztecAddress, nonce: Field
+  // We need to compute the message we want to sign and add it to the wallet as approved
+  const action = oracle
+    .withWallet(sender)
+    .methods.submit_question(from.getAddress(), question, divinity, nonce);
+
+  const messageHash = computeAuthWitMessageHash(
+    sender.getAddress(),
+    action.request()
+  );
+
+  // Both wallets are connected to same node and PXE so we could just insert directly using
+  // await wallet.signAndAddAuthWitness(messageHash, );
+  // But doing it in two actions to show the flow.
+  const witness = await from.createAuthWitness(messageHash);
+
+  await sender.addAuthWitness(witness);
+
+  return action;
+};
+
 
 const addTokenAndFeeNotesToPXE = async (
   requester: AztecAddress,
@@ -1371,12 +1407,6 @@ const sendQuestionsBatch = async (questionNotes: QuestionNote[]) => {
         token,
         requester,
         oracle.address,
-        [
-          requester.getAddress(),
-          divinity.getAddress(),
-          ADDRESS_ZERO,
-          ADDRESS_ZERO,
-        ],
         FEE
       )
     )
@@ -1387,6 +1417,7 @@ const sendQuestionsBatch = async (questionNotes: QuestionNote[]) => {
     questionNotes.map((questionNote, i) =>
       oracle.methods
         .submit_question(
+          requester.getAddress(),
           questionNote.request,
           divinity.getAddress(),
           nonces[i],

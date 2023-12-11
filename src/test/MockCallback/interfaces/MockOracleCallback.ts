@@ -82,7 +82,19 @@ export class MockOracleCallbackContract extends ContractBase {
     /** compute_note_hash_and_nullifier(contract_address: field, nonce: field, storage_slot: field, serialized_note: array) */
     compute_note_hash_and_nullifier: ((contract_address: FieldLike, nonce: FieldLike, storage_slot: FieldLike, serialized_note: FieldLike[]) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 
+    /** deserialize_callback_data() */
+    deserialize_callback_data: (() => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
+
+    /** get_received_data(inputs: struct) */
+    get_received_data: ((inputs: { call_context: { msg_sender: FieldLike, storage_contract_address: FieldLike, portal_contract_address: FieldLike, function_selector: FieldLike, is_delegate_call: boolean, is_static_call: boolean, is_contract_deployment: boolean }, block_data: { note_hash_tree_root: FieldLike, nullifier_tree_root: FieldLike, contract_tree_root: FieldLike, l1_to_l2_messages_tree_root: FieldLike, blocks_tree_root: FieldLike, public_data_tree_root: FieldLike, global_variables_hash: FieldLike }, public_global_variables: { chain_id: FieldLike, version: FieldLike, block_number: FieldLike, timestamp: FieldLike } }) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
+
     /** oracle_callback(answer: field, data: array) */
     oracle_callback: ((answer: FieldLike, data: FieldLike[]) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
+
+    /** serialize_callback_data() */
+    serialize_callback_data: (() => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
+
+    /** write_received_data(answer: field, data: array) */
+    write_received_data: ((answer: FieldLike, data: FieldLike[]) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
   };
 }

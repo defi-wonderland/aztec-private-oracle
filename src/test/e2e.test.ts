@@ -335,7 +335,7 @@ describe("E2E Private Oracle", () => {
           QUESTION_NOTE.request + 69n,
           divinity.getAddress(),
           nonce,
-          [mockCallback.address.toBigInt(), 69n, 69n, 69n, 69n, 69n]
+          [0n, 69n, 420n, 42069n, 69420n, 6942069n]
         )
         .send()
         .wait();
@@ -343,7 +343,7 @@ describe("E2E Private Oracle", () => {
       expect(receipt.status).toBe("mined");
 
       // Check: is the callback correctly stored?
-      const question: QuestionNote = (
+      const question: QuestionNote[] = (
         await oracle
           .withWallet(requester)
           .methods.get_pending_questions_unconstrained(
@@ -353,15 +353,22 @@ describe("E2E Private Oracle", () => {
           .view({ from: requester.getAddress() })
       )
         .map((questionNote: any) => questionNote._value)
-        .map((x: QuestionNote) => QuestionNote.fromChainData(x))[0]; // returns 10 by default
+        .map((x: QuestionNote) => QuestionNote.fromChainData(x)); // returns 10 by default
 
-      expect(question.callback).toEqual([
+      // Filter the question with the correct request
+      const questionWithCallback = question.filter(
+        (e) => e.request === QUESTION_NOTE.request + 69n
+      )[0];
+
+      console.log(questionWithCallback);
+
+      expect(questionWithCallback.callback).toEqual([
         mockCallback.address.toBigInt(),
         69n,
-        69n,
-        69n,
-        69n,
-        69n,
+        420n,
+        42069n,
+        69420n,
+        6942069n,
       ]);
     });
   });

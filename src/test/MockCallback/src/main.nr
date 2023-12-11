@@ -1,9 +1,9 @@
 contract MockOracleCallback {
-    use dep::aztec::types::type_serialization::{ TypeSerializationInterface};
-
     use dep::aztec::{
         context::{PrivateContext, PublicContext, Context},
-        state_vars::public_state::PublicState
+        state_vars::public_state::PublicState,
+        selector::compute_selector,
+        types::type_serialization::TypeSerializationInterface
     };
 
     use dep::aztec::oracle::debug_log::{ debug_log, debug_log_field, debug_log_format };
@@ -23,14 +23,14 @@ contract MockOracleCallback {
             }
         }
 
-        fn deserialize_callback_data(preimage: [Field; CALLBACK_DATA_LENGTH]) -> Self {
+        fn deserialize(preimage: [Field; CALLBACK_DATA_LENGTH]) -> Self {
             Callback_Data {
                 answer: preimage[0],
                 data: [preimage[1], preimage[2], preimage[3], preimage[4], preimage[5]]
             }
         }
 
-        fn serialize_callback_data(self) -> [Field; CALLBACK_DATA_LENGTH] {
+        fn serialize(self) -> [Field; CALLBACK_DATA_LENGTH] {
             [
                 self.answer,
                 self.data[0],
@@ -43,11 +43,11 @@ contract MockOracleCallback {
     }
 
     fn serialize_callback_data(callback_data: Callback_Data) -> pub [Field; CALLBACK_DATA_LENGTH] {
-        callback_data.serialize_callback_data()
+        callback_data.serialize()
     }
 
     fn deserialize_callback_data(preimage: [Field; CALLBACK_DATA_LENGTH]) -> pub Callback_Data {
-        Callback_Data::deserialize_callback_data(preimage)
+        Callback_Data::deserialize(preimage)
     }
 
     global CallbackDataSerializationMethods = TypeSerializationInterface {
@@ -60,34 +60,29 @@ contract MockOracleCallback {
     }
 
     impl Storage {
-        fn init(context: Context) -> Self {
+        pub fn init(context: Context) -> Self {
             Storage {
                 // -- Public --
-                data_received: PublicState::new(context, 1, CallbackDataSerializationMethods),
+                data_received: PublicState::new(context, 1, CallbackDataSerializationMethods)
             }
         }
     }
 
     #[aztec(private)]
-    constructor() {
-       _;
+    fn constructor() {
     }
 
     #[aztec(private)]
-    fn oracle_callback(answer: Field, data: [Field; 5]) {
-        // Do nothing and avoid warning
-        assert(data==data);
-        assert(answer==answer);
-        
-        debug_log("Oracle callback called");
-        debug_log_field(answer);
-        debug_log_format("Data: %x %x %x %x %x", [data[0], data[1], data[2], data[3], data[4]]);
+    fn oracle_callback(answer: Field, data: [Field; 5]) {      
+        debug_log("--------------- oracle_callback called ---------------");
+        debug_log_format("answer: {0}", [answer]);
+        debug_log_format("Data: {0} {1} {2} {3} {4}", [data[0], data[1], data[2], data[3], data[4]]);
 
         // Intentional public leak
         context.call_public_function(
             context.this_address(), 
             compute_selector("write_received_data(Field,[Field; 5])"), 
-            [answer, data]);
+            serialize_callback_data(Callback_Data::new(answer, data)));
     }
 
     #[aztec(public)]
@@ -96,7 +91,7 @@ contract MockOracleCallback {
     }
 
     #[aztec(public)]
-    unconstrained fn get_received_data() -> Callback_Data {) {
+    unconstrained fn get_received_data() -> Callback_Data {
         storage.data_received.read()
     }
 

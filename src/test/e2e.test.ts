@@ -191,29 +191,28 @@ describe("E2E Private Oracle", () => {
 
     // Test: is the note correctly stored in the private storage, for the requester
     it("requester question note has the correct data", async () => {
-      const question: QuestionNote = (
-        await oracle
-          .withWallet(requester)
-          .methods.get_pending_questions_unconstrained(
-            divinity.getAddress(),
-            0n
-          )
-          .view({ from: requester.getAddress() })
-      )
-        .map((questionNote: any) => questionNote._value)
-        .map((x: QuestionNote) => QuestionNote.fromChainData(x))[0]; // returns 10 by default
+      const question: QuestionNote = QuestionNote.fromChainData(
+        (
+          await oracle
+            .withWallet(requester)
+            .methods.get_pending_questions_unconstrained(
+              divinity.getAddress(),
+              0n
+            )
+            .view({ from: requester.getAddress() })
+        )[0]._value
+      ); // returns 10 by default
 
       // Check: Compare the note's data with the expected values
       type QuestionNoteWithoutRandom = Omit<
         QuestionNote,
-        "shared_nullifier_key"
+        "shared_nullifier_key" | "callback"
       >;
 
       const questionNoteWithoutRandom: QuestionNoteWithoutRandom = {
         request: QUESTION_NOTE.request,
         requester: QUESTION_NOTE.requester,
         divinity: QUESTION_NOTE.divinity,
-        callback: QUESTION_NOTE.callback,
       };
 
       expect(question).toEqual(

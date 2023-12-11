@@ -112,7 +112,7 @@ export class PrivateOracleContract extends ContractBase {
     /** submit_answer(question: field, requester: struct, answer: field) */
     submit_answer: ((question: FieldLike, requester: AztecAddressLike, answer: FieldLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 
-    /** submit_question(question: field, divinity_address: struct, nonce: field, callback: array) */
-    submit_question: ((question: FieldLike, divinity_address: AztecAddressLike, nonce: FieldLike, callback: FieldLike[]) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
+    /** submit_question(from: struct, question: field, divinity_address: struct, nonce: field, callback: array) */
+    submit_question: ((from: AztecAddressLike, question: FieldLike, divinity_address: AztecAddressLike, nonce: FieldLike, callback: FieldLike[]) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
   };
 }

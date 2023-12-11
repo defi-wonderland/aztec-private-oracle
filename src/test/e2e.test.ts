@@ -18,7 +18,7 @@ import {
 import { TokenContract } from "../token/Token.js";
 import { MockOracleCallbackContract } from "./MockCallback/interfaces/MockOracleCallback.js";
 
-import { PrivateOracleContract } from "../../types/PrivateOracle.js";
+import { PrivateOracleContract } from "../../interfaces/PrivateOracle.js";
 import { AnswerNote, QuestionNote } from "../../types/Notes.js";
 import { initAztecJs } from "@aztec/aztec.js/init";
 
@@ -340,26 +340,19 @@ describe("E2E Private Oracle", () => {
         token,
         requester,
         oracle.address,
-        [
-          requester.getAddress(),
-          divinity.getAddress(),
-          ADDRESS_ZERO,
-          ADDRESS_ZERO,
-        ],
         FEE
       );
 
       // Submit the question
       const receipt = await oracle
         .withWallet(requester)
-        .methods.submit_question(123456n, divinity.getAddress(), nonce, [
-          mockCallback.address.toBigInt(),
-          69n,
-          420n,
-          42069n,
-          69420n,
-          6942069n,
-        ])
+        .methods.submit_question(
+          requester.getAddress(),
+          123456n,
+          divinity.getAddress(),
+          nonce,
+          [mockCallback.address.toBigInt(), 69n, 420n, 42069n, 69420n, 6942069n]
+        )
         .send()
         .wait();
 
@@ -626,26 +619,19 @@ describe("E2E Private Oracle", () => {
         token,
         requester,
         oracle.address,
-        [
-          requester.getAddress(),
-          divinity.getAddress(),
-          ADDRESS_ZERO,
-          ADDRESS_ZERO,
-        ],
         FEE
       );
 
       // Submit the question
       let _ = await oracle
         .withWallet(requester)
-        .methods.submit_question(NEW_REQUEST, divinity.getAddress(), nonce, [
-          mockCallback.address.toBigInt(),
-          69n,
-          420n,
-          42069n,
-          69420n,
-          6942069n,
-        ])
+        .methods.submit_question(
+          requester.getAddress(),
+          NEW_REQUEST,
+          divinity.getAddress(),
+          nonce,
+          [mockCallback.address.toBigInt(), 69n, 420n, 42069n, 69420n, 6942069n]
+        )
         .send()
         .wait();
 
@@ -1278,12 +1264,7 @@ const createAuthEscrowMessage = async (
   const nonce = Fr.random();
 
   // We need to compute the message we want to sign and add it to the wallet as approved
-  const action = token.methods.escrow(
-    from.getAddress(),
-    agent,
-    amount,
-    nonce
-  );
+  const action = token.methods.escrow(from.getAddress(), agent, amount, nonce);
   const messageHash = await computeAuthWitMessageHash(agent, action.request());
 
   // Both wallets are connected to same node and PXE so we could just insert directly using
@@ -1300,13 +1281,20 @@ const createAuthSubmitQuestionMessage = async (
   from: AccountWalletWithPrivateKey,
   question: Fr,
   divinity: AztecAddress,
-  nonce: Fr
+  nonce: Fr,
+  callback: bigint[] = EMPTY_CALLBACK
 ) => {
   // from: AztecAddress, question: Field, divinity_address: AztecAddress, nonce: Field
   // We need to compute the message we want to sign and add it to the wallet as approved
   const action = oracle
     .withWallet(sender)
-    .methods.submit_question(from.getAddress(), question, divinity, nonce);
+    .methods.submit_question(
+      from.getAddress(),
+      question,
+      divinity,
+      nonce,
+      callback
+    );
 
   const messageHash = computeAuthWitMessageHash(
     sender.getAddress(),

@@ -285,15 +285,6 @@ contract PrivateOracle {
         // Is there a callback address?
         let callback = request.unwrap_unchecked().callback;
 
-        let mut _target = callback[0];
-
-        if(_target == 0) { _target = address_this.address; }
-
-        let _ = PrivateOracleCallbackInterface::at(_target).trigger_callback(
-            &mut context,
-            answer,
-            callback); 
-
         // Nullify the question note (will nullify both divinity and requester notes, via the shared key)
         storage.questions.remove(request.unwrap_unchecked());
 
@@ -306,6 +297,13 @@ contract PrivateOracle {
             escrow_randomness,
             0
         );
+
+        let mut _target = callback[0];
+
+        let _ = PrivateOracleCallbackInterface::at(_target).trigger_callback(
+            &mut context,
+            answer,
+            callback); 
     }
 
     // Requester consults the answer to one of their questions
@@ -351,13 +349,6 @@ contract PrivateOracle {
             escrow_randomness,
             0
         );
-    }
-
-    #[aztec(private)]
-    fn oracle_callback(answer: Field, data: [Field; 5]) -> Field {
-        // Do nothing and avoid warning
-        assert(data==data);
-        assert(answer==answer);
     }
 
     // Return all questions from a given requester that the caller can decrypt (max 10 for now)

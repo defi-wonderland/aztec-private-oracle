@@ -109,9 +109,6 @@ export class PrivateOracleContract extends ContractBase {
     /** initialize_payment_token(payment_token: field, fee: field) */
     initialize_payment_token: ((payment_token: FieldLike, fee: FieldLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 
-    /** oracle_callback(answer: field, data: array) */
-    oracle_callback: ((answer: FieldLike, data: FieldLike[]) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
-
     /** submit_answer(question: field, requester: struct, answer: field) */
     submit_answer: ((question: FieldLike, requester: AztecAddressLike, answer: FieldLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 

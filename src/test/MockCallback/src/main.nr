@@ -77,11 +77,14 @@ contract MockOracleCallback {
         debug_log("--------------- oracle_callback called ---------------");
         debug_log_format("answer: {0}", [answer]);
         debug_log_format("Data: {0} {1} {2} {3} {4}", [data[0], data[1], data[2], data[3], data[4]]);
+        
+        debug_log_format("compute_selector write_received_data(Field,[Field;5]: {0}", [compute_selector("write_received_data(Field,[Field;5])")]);
 
         // Intentional public leak
         context.call_public_function(
             context.this_address(), 
-            compute_selector("write_received_data(Field,[Field; 5])"), 
+            compute_selector("write_received_data(Field,[Field;5])"),
+            //0x8403c526,
             serialize_callback_data(Callback_Data::new(answer, data)));
     }
 
@@ -90,7 +93,6 @@ contract MockOracleCallback {
         storage.data_received.write(Callback_Data::new(answer, data));
     }
 
-    #[aztec(public)]
     unconstrained fn get_received_data() -> Callback_Data {
         storage.data_received.read()
     }

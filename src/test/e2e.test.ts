@@ -68,7 +68,7 @@ beforeAll(async () => {
 }, 120_000);
 
 describe("E2E Private Oracle", () => {
-  describe.only("submit_question(..)", () => {
+  describe("submit_question(..)", () => {
     // global scoped to assert accross 'it' blocks
     let shared_key_nullifier_divinity: bigint;
     let shared_key_nullifier_requester: bigint;
@@ -360,8 +360,6 @@ describe("E2E Private Oracle", () => {
         (e) => e.request === 123456n
       )[0];
 
-      console.log(questionWithCallback);
-
       expect(questionWithCallback.callback).toEqual([
         mockCallback.address.toBigInt(),
         69n,
@@ -602,7 +600,62 @@ describe("E2E Private Oracle", () => {
     }, 120_000);
 
     // Test: callback address is correctly called, if provided
-    it("callback is correctly called", async () => {});
+    it("callback is correctly called", async () => {
+      const NEW_REQUEST = 123456n;
+      const NEW_ANSWER = 654321n;
+
+      // Deploy the contract receiving the callback
+      mockCallback = await MockOracleCallbackContract.deploy(deployer)
+        .send()
+        .deployed();
+
+      const nonce = await createAuthEscrowMessage(
+        token,
+        requester,
+        oracle.address,
+        [
+          requester.getAddress(),
+          divinity.getAddress(),
+          ADDRESS_ZERO,
+          ADDRESS_ZERO,
+        ],
+        FEE
+      );
+
+      // Submit the question
+      let _ = await oracle
+        .withWallet(requester)
+        .methods.submit_question(NEW_REQUEST, divinity.getAddress(), nonce, [
+          mockCallback.address.toBigInt(),
+          69n,
+          420n,
+          42069n,
+          69420n,
+          6942069n,
+        ])
+        .send()
+        .wait();
+
+      // Submit the answer
+      let __ = await oracle
+        .withWallet(divinity)
+        .methods.submit_answer(NEW_REQUEST, requester.getAddress(), NEW_ANSWER)
+        .send()
+        .wait();
+
+      // Check that the callback has been triggered (see sandbox log too)
+      const _storedCallbackData = await mockCallback
+        .withWallet(requester)
+        .methods.get_received_data()
+        .view();
+
+      expect(_storedCallbackData.answer).toEqual(NEW_ANSWER);
+      expect(_storedCallbackData.data[0]).toEqual(69n);
+      expect(_storedCallbackData.data[1]).toEqual(420n);
+      expect(_storedCallbackData.data[2]).toEqual(42069n);
+      expect(_storedCallbackData.data[3]).toEqual(69420n);
+      expect(_storedCallbackData.data[4]).toEqual(6942069n);
+    }, 120_000);
   });
 
   describe("cancel_question(..)", () => {

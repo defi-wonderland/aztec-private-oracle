@@ -37,11 +37,6 @@ Answer:
 mod types;
  
 contract PrivateOracle {
-
-    /// DEBUG
-    use dep::aztec::oracle::debug_log::{ debug_log, debug_log_field, debug_log_format };
-    /// DEBUG
-
     use crate::types::question_note:: {QuestionNote, QuestionNoteMethods, QUESTION_NOTE_LEN};
     use crate::types::answer_note:: {AnswerNote, AnswerNoteMethods, ANSWER_NOTE_LEN};
     use crate::types::fee_note:: {FeeNote, FeeNoteMethods, FEE_NOTE_LEN};
@@ -300,10 +295,12 @@ contract PrivateOracle {
 
         let mut _target = callback[0];
 
-        let _ = PrivateOracleCallbackInterface::at(_target).trigger_callback(
-            &mut context,
-            answer,
-            callback); 
+        if(_target != 0) {
+            let _ = PrivateOracleCallbackInterface::at(_target).trigger_callback(
+                &mut context,
+                answer,
+                callback);
+        }
     }
 
     // Requester consults the answer to one of their questions

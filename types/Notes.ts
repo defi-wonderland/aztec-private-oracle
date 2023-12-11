@@ -63,7 +63,7 @@ export class QuestionNote {
       AztecAddress.fromBigInt(note.requester_address.address),
       AztecAddress.fromBigInt(note.divinity_address.address),
       note.shared_nullifier_key,
-      (note.callback = [])
+      note.callback
     );
   }
 
@@ -73,7 +73,7 @@ export class QuestionNote {
       AztecAddress.fromBigInt(note.requester_address.asBigInt),
       AztecAddress.fromBigInt(note.divinity_address.asBigInt),
       note.shared_nullifier_key,
-      (note.callback = [])
+      note.callback
     );
   }
 }

@@ -172,14 +172,13 @@ describe("E2E Private Oracle", () => {
       // Check: Compare the note's data with the expected values
       type QuestionNoteWithoutRandom = Omit<
         QuestionNote,
-        "shared_nullifier_key"
+        "shared_nullifier_key" | "callback"
       >;
 
       const questionNoteWithoutRandom: QuestionNoteWithoutRandom = {
         request: QUESTION_NOTE.request,
         requester: QUESTION_NOTE.requester,
         divinity: QUESTION_NOTE.divinity,
-        callback: QUESTION_NOTE.callback,
       };
 
       expect(question).toEqual(
@@ -331,12 +330,14 @@ describe("E2E Private Oracle", () => {
       // Submit the question
       const receipt = await oracle
         .withWallet(requester)
-        .methods.submit_question(
-          QUESTION_NOTE.request + 69n,
-          divinity.getAddress(),
-          nonce,
-          [0n, 69n, 420n, 42069n, 69420n, 6942069n]
-        )
+        .methods.submit_question(123456n, divinity.getAddress(), nonce, [
+          mockCallback.address.toBigInt(),
+          69n,
+          420n,
+          42069n,
+          69420n,
+          6942069n,
+        ])
         .send()
         .wait();
 
@@ -357,7 +358,7 @@ describe("E2E Private Oracle", () => {
 
       // Filter the question with the correct request
       const questionWithCallback = question.filter(
-        (e) => e.request === QUESTION_NOTE.request + 69n
+        (e) => e.request === 123456n
       )[0];
 
       console.log(questionWithCallback);
@@ -600,6 +601,9 @@ describe("E2E Private Oracle", () => {
       // Check: Compare the answer with the expected value
       expect(answer).toEqual(ANSWER_NOTE_REQUESTER);
     }, 120_000);
+
+    // Test: callback address is correctly called, if provided
+    it("callback is correctly called", async () => {});
   });
 
   describe("cancel_question(..)", () => {

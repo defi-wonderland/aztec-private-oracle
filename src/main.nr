@@ -49,10 +49,11 @@ contract PrivateOracle {
         FromUnshieldStruct, 
         ToUnshieldStruct,
         FromEscrowStruct,
-        AgentEscrowStruct,
-        ParticipantsEscrowStruct,
+        OwnerEscrowStruct,
         RecipientSettleEscrowStruct,
-        AgentSettleEscrowStruct
+        OwnerSettleEscrowStruct,
+        AccountBroadcastEscrowNoteForStruct,
+        OwnerBroadcastEscrowNoteForStruct
     };
 
     use dep::std::option::Option;
@@ -167,21 +168,39 @@ contract PrivateOracle {
         let address_this = AztecAddress::new(context.this_address());
         let mut escrow_randomness = 0;
 
+ 
+
         if(payment_token.address != 0) {
+
+            let token_contract = TokenPrivateContextInterface::at(payment_token.address);
+
             // Take the payment from the user
-            escrow_randomness = TokenPrivateContextInterface::at(payment_token.address).escrow(
+            escrow_randomness = token_contract.escrow(
                 &mut context,
                 FromEscrowStruct { address: from.address },
-                AgentEscrowStruct { address: address_this.address },
+                OwnerEscrowStruct { address: address_this.address },
                 fee,
-                [
-                    ParticipantsEscrowStruct { address: from.address },
-                    ParticipantsEscrowStruct { address: divinity_address.address },
-                    ParticipantsEscrowStruct { address: 0 },
-                    ParticipantsEscrowStruct { address: 0 }
-                ],
                 nonce
             )[0];
+
+            // Broadcast the escrow to the user
+            let _ = token_contract.broadcast_escrow_note_for(
+                &mut context,
+                AccountBroadcastEscrowNoteForStruct { address: from.address },
+                OwnerBroadcastEscrowNoteForStruct { address: address_this.address },
+                fee,
+                escrow_randomness
+            );
+
+            // Broadcast the escrow to the divinity
+            let _ = token_contract.broadcast_escrow_note_for(
+                &mut context,
+                AccountBroadcastEscrowNoteForStruct { address: divinity_address.address },
+                OwnerBroadcastEscrowNoteForStruct { address: address_this.address },
+                fee,
+                escrow_randomness
+            );
+
         } else {
             assert(false, "Payment token not set");
         }
@@ -294,7 +313,7 @@ contract PrivateOracle {
         // Pay the divinity
         let _ = TokenPrivateContextInterface::at(payment_token.address).settle_escrow(
             &mut context,
-            AgentSettleEscrowStruct { address: address_this.address },
+            OwnerSettleEscrowStruct { address: address_this.address },
             RecipientSettleEscrowStruct { address: divinity_calling.address }, 
             fee,
             escrow_randomness,
@@ -339,7 +358,7 @@ contract PrivateOracle {
         // Return funds to user
         let _ = TokenPrivateContextInterface::at(payment_token.address).settle_escrow(
             &mut context,
-            AgentSettleEscrowStruct { address: address_this.address },
+            OwnerSettleEscrowStruct { address: address_this.address },
             RecipientSettleEscrowStruct { address: caller.address }, 
             fee,
             escrow_randomness,

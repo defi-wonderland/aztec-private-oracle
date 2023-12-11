@@ -117,12 +117,6 @@ describe("E2E Private Oracle", () => {
         token,
         requester,
         oracle.address,
-        [
-          requester.getAddress(),
-          divinity.getAddress(),
-          ADDRESS_ZERO,
-          ADDRESS_ZERO,
-        ],
         FEE
       );
       // Submit the question
@@ -229,12 +223,6 @@ describe("E2E Private Oracle", () => {
         token,
         requester2,
         oracle.address,
-        [
-          requester2.getAddress(),
-          divinity.getAddress(),
-          ADDRESS_ZERO,
-          ADDRESS_ZERO,
-        ],
         FEE
       );
 
@@ -305,12 +293,6 @@ describe("E2E Private Oracle", () => {
         token,
         requester2,
         oracle.address,
-        [
-          requester2.getAddress(),
-          divinity.getAddress(),
-          ADDRESS_ZERO,
-          ADDRESS_ZERO,
-        ],
         FEE
       );
 
@@ -380,12 +362,6 @@ describe("E2E Private Oracle", () => {
         token,
         requester,
         oracle.address,
-        [
-          requester.getAddress(),
-          divinity.getAddress(),
-          ADDRESS_ZERO,
-          ADDRESS_ZERO,
-        ],
         FEE
       );
 
@@ -515,12 +491,6 @@ describe("E2E Private Oracle", () => {
         token,
         requester2,
         oracle.address,
-        [
-          requester2.getAddress(),
-          divinity.getAddress(),
-          ADDRESS_ZERO,
-          ADDRESS_ZERO,
-        ],
         FEE
       );
 
@@ -598,12 +568,6 @@ describe("E2E Private Oracle", () => {
         token,
         requester,
         oracle.address,
-        [
-          requester.getAddress(),
-          divinity.getAddress(),
-          ADDRESS_ZERO,
-          ADDRESS_ZERO,
-        ],
         FEE
       );
 
@@ -989,7 +953,7 @@ describe("E2E Private Oracle", () => {
 
       // Submit the answers
       await sendAnswersBatch(ANSWER_NOTE_REQUESTER);
-    }, 120_000);
+    }, 160_000);
 
     it("get_answers returns the correct answers to the requester", async () => {
       // get the answers
@@ -1168,7 +1132,6 @@ const createAuthEscrowMessage = async (
   token: TokenContract,
   from: AccountWalletWithPrivateKey,
   agent: AztecAddress,
-  participants: AztecAddress[],
   amount: any
 ) => {
   const nonce = Fr.random();
@@ -1178,7 +1141,6 @@ const createAuthEscrowMessage = async (
     from.getAddress(),
     agent,
     amount,
-    participants,
     nonce
   );
   const messageHash = await computeAuthWitMessageHash(agent, action.request());
@@ -1304,12 +1266,6 @@ const sendQuestionsBatch = async (questionNotes: QuestionNote[]) => {
         token,
         requester,
         oracle.address,
-        [
-          requester.getAddress(),
-          divinity.getAddress(),
-          ADDRESS_ZERO,
-          ADDRESS_ZERO,
-        ],
         FEE
       )
     )

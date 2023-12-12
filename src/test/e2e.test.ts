@@ -41,6 +41,8 @@ const MINT_AMOUNT = 100000000n;
 const ADDRESS_ZERO = AztecAddress.fromBigInt(0n);
 
 const EMPTY_CALLBACK = [0n, 0n, 0n, 0n, 0n, 0n];
+// First element should be replaced by the callback address (submit_question) or the answer (submit_answer)
+const CALLBACK_DATA = [69n, 420n, 42069n, 69420n, 6942069n]; 
 
 let pxe: PXE;
 let oracle: PrivateOracleContract;
@@ -351,7 +353,7 @@ describe("E2E Private Oracle", () => {
           123456n,
           divinity.getAddress(),
           nonce,
-          [mockCallback.address.toBigInt(), 69n, 420n, 42069n, 69420n, 6942069n]
+          [mockCallback.address.toBigInt(), ...CALLBACK_DATA]
         )
         .send()
         .wait();
@@ -378,11 +380,7 @@ describe("E2E Private Oracle", () => {
 
       expect(questionWithCallback.callback).toEqual([
         mockCallback.address.toBigInt(),
-        69n,
-        420n,
-        42069n,
-        69420n,
-        6942069n,
+        ...CALLBACK_DATA,
       ]);
     });
   });
@@ -623,20 +621,20 @@ describe("E2E Private Oracle", () => {
       );
 
       // Submit the question
-      let _ = await oracle
+      await oracle
         .withWallet(requester)
         .methods.submit_question(
           requester.getAddress(),
           NEW_REQUEST,
           divinity.getAddress(),
           nonce,
-          [mockCallback.address.toBigInt(), 69n, 420n, 42069n, 69420n, 6942069n]
+          [mockCallback.address.toBigInt(), ...CALLBACK_DATA]
         )
         .send()
         .wait();
 
       // Submit the answer
-      let __ = await oracle
+      await oracle
         .withWallet(divinity)
         .methods.submit_answer(NEW_REQUEST, requester.getAddress(), NEW_ANSWER)
         .send()
@@ -648,12 +646,10 @@ describe("E2E Private Oracle", () => {
         .methods.get_received_data()
         .view();
 
-      expect(_storedCallbackData.answer).toEqual(NEW_ANSWER);
-      expect(_storedCallbackData.data[0]).toEqual(69n);
-      expect(_storedCallbackData.data[1]).toEqual(420n);
-      expect(_storedCallbackData.data[2]).toEqual(42069n);
-      expect(_storedCallbackData.data[3]).toEqual(69420n);
-      expect(_storedCallbackData.data[4]).toEqual(6942069n);
+      expect(Object.values(_storedCallbackData).flat()).toEqual([
+        NEW_ANSWER,
+        ...CALLBACK_DATA,
+      ]);
     }, 120_000);
   });
 

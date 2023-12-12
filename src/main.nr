@@ -160,6 +160,10 @@ contract PrivateOracle {
     }
 
     // Requester submit a question
+    // The nonce is used twice in case this is called by someone else instead of having two different ones.
+    // Once for the authwit of the submit_question
+    // Once for the authwit of the escrow call for the token
+    // The user has to sign the two authwits with the same nonce to make it work
     #[aztec(private)]
     fn submit_question(from: AztecAddress, question: Field, divinity_address: AztecAddress, nonce: Field, callback: [Field; 6]) {
         if (from.address != context.msg_sender()) {

@@ -16,9 +16,11 @@ import {
 } from "@aztec/aztec.js";
 
 import { TokenContract } from "../token/Token.js";
+import { MockOracleCallbackContract } from "./MockCallback/interfaces/MockOracleCallback.js";
 
-import { PrivateOracleContract } from "../../types/PrivateOracle.js";
+import { PrivateOracleContract } from "../../interfaces/PrivateOracle.js";
 import { AnswerNote, QuestionNote } from "../../types/Notes.js";
+import { initAztecJs } from "@aztec/aztec.js/init";
 
 const {
   SANDBOX_URL = "http://localhost:8080",
@@ -38,9 +40,15 @@ const MINT_AMOUNT = 100000000n;
 
 const ADDRESS_ZERO = AztecAddress.fromBigInt(0n);
 
+const EMPTY_CALLBACK = [0n, 0n, 0n, 0n, 0n, 0n];
+// First element should be replaced by the callback address (submit_question) or the answer (submit_answer)
+const CALLBACK_DATA = [69n, 420n, 42069n, 69420n, 6942069n]; 
+
 let pxe: PXE;
 let oracle: PrivateOracleContract;
 let token: TokenContract;
+
+let mockCallback: MockOracleCallbackContract;
 
 let requester: AccountWalletWithPrivateKey;
 let requester2: AccountWalletWithPrivateKey;
@@ -51,6 +59,8 @@ let deployer: AccountWalletWithPrivateKey;
 beforeAll(async () => {
   const { SANDBOX_URL = "http://localhost:8080" } = process.env;
   pxe = createPXEClient(SANDBOX_URL);
+
+  await initAztecJs();
 
   [, [requester, requester2, divinity], deployer] = await Promise.all([
     waitForSandbox(pxe),
@@ -126,7 +136,8 @@ describe("E2E Private Oracle", () => {
           requester.getAddress(),
           QUESTION_NOTE.request,
           divinity.getAddress(),
-          nonce
+          nonce,
+          EMPTY_CALLBACK
         )
         .send()
         .wait();
@@ -143,7 +154,7 @@ describe("E2E Private Oracle", () => {
 
     // Test: is the note correctly stored in the private storage, for the divinity
     it("divinity question note has the correct data", async () => {
-      const question: QuestionNote = QuestionNote.fromChainData(
+      const question: QuestionNote = new QuestionNote(
         (
           await oracle
             .withWallet(divinity)
@@ -158,7 +169,7 @@ describe("E2E Private Oracle", () => {
       // Check: Compare the note's data with the expected values
       type QuestionNoteWithoutRandom = Omit<
         QuestionNote,
-        "shared_nullifier_key"
+        "shared_nullifier_key" | "callback"
       >;
 
       const questionNoteWithoutRandom: QuestionNoteWithoutRandom = {
@@ -177,22 +188,22 @@ describe("E2E Private Oracle", () => {
 
     // Test: is the note correctly stored in the private storage, for the requester
     it("requester question note has the correct data", async () => {
-      const question: QuestionNote = (
-        await oracle
-          .withWallet(requester)
-          .methods.get_pending_questions_unconstrained(
-            divinity.getAddress(),
-            0n
-          )
-          .view({ from: requester.getAddress() })
-      )
-        .map((questionNote: any) => questionNote._value)
-        .map((x: QuestionNote) => QuestionNote.fromChainData(x))[0]; // returns 10 by default
+      const question: QuestionNote = new QuestionNote(
+        (
+          await oracle
+            .withWallet(requester)
+            .methods.get_pending_questions_unconstrained(
+              divinity.getAddress(),
+              0n
+            )
+            .view({ from: requester.getAddress() })
+        )[0]._value
+      ); // returns 10 by default
 
       // Check: Compare the note's data with the expected values
       type QuestionNoteWithoutRandom = Omit<
         QuestionNote,
-        "shared_nullifier_key"
+        "shared_nullifier_key" | "callback"
       >;
 
       const questionNoteWithoutRandom: QuestionNoteWithoutRandom = {
@@ -236,7 +247,8 @@ describe("E2E Private Oracle", () => {
           requester2.getAddress(),
           QUESTION_NOTE.request,
           divinity.getAddress(),
-          nonce
+          nonce,
+          EMPTY_CALLBACK
         )
         .send()
         .wait();
@@ -251,7 +263,7 @@ describe("E2E Private Oracle", () => {
           .view({ from: divinity.getAddress() })
       )
         .map((questionNote: any) => questionNote._value)
-        .map((x: QuestionNote) => QuestionNote.fromChainData(x)); // returns 10 by default
+        .map((x: QuestionNote) => new QuestionNote(x)); // returns 10 by default
 
       // Check: Compare the note's data with the expected values
       type QuestionNoteWithoutRandom = Omit<
@@ -263,6 +275,7 @@ describe("E2E Private Oracle", () => {
         request: QUESTION_NOTE.request,
         requester: QUESTION_NOTE.requester,
         divinity: QUESTION_NOTE.divinity,
+        callback: QUESTION_NOTE.callback,
       };
 
       // Remove duplicates (by default, return all notes from all wallets in the pxe) and empty notes
@@ -317,6 +330,59 @@ describe("E2E Private Oracle", () => {
         storageSlot: new Fr(7),
       });
     }, 120_000);
+
+    // Test: if a callback is provided, it is correctly stored
+    it("callback is correctly stored", async () => {
+      // Deploy the contract receiving the callback
+      mockCallback = await MockOracleCallbackContract.deploy(deployer)
+        .send()
+        .deployed();
+
+      const nonce = await createAuthEscrowMessage(
+        token,
+        requester,
+        oracle.address,
+        FEE
+      );
+
+      // Submit the question
+      const receipt = await oracle
+        .withWallet(requester)
+        .methods.submit_question(
+          requester.getAddress(),
+          123456n,
+          divinity.getAddress(),
+          nonce,
+          [mockCallback.address.toBigInt(), ...CALLBACK_DATA]
+        )
+        .send()
+        .wait();
+
+      expect(receipt.status).toBe("mined");
+
+      // Check: is the callback correctly stored?
+      const question: QuestionNote[] = (
+        await oracle
+          .withWallet(requester)
+          .methods.get_pending_questions_unconstrained(
+            divinity.getAddress(),
+            0n
+          )
+          .view({ from: requester.getAddress() })
+      )
+        .map((questionNote: any) => questionNote._value)
+        .map((x: QuestionNote) => new QuestionNote(x)); // returns 10 by default
+
+      // Filter the question with the correct request
+      const questionWithCallback = question.filter(
+        (e) => e.request === 123456n
+      )[0];
+
+      expect(questionWithCallback.callback).toEqual([
+        mockCallback.address.toBigInt(),
+        ...CALLBACK_DATA,
+      ]);
+    });
   });
 
   describe("submit_answer(..)", () => {
@@ -372,7 +438,8 @@ describe("E2E Private Oracle", () => {
           requester.getAddress(),
           QUESTION_NOTE.request,
           divinity.getAddress(),
-          nonce
+          nonce,
+          EMPTY_CALLBACK
         )
         .send()
         .wait();
@@ -411,7 +478,7 @@ describe("E2E Private Oracle", () => {
           .view({ from: divinity.getAddress() })
       )
         .map((answerNote: any) => answerNote._value)
-        .map((x: AnswerNote) => AnswerNote.fromChainData(x))[0];
+        .map((x: AnswerNote) => new AnswerNote(x))[0];
 
       // Check: are all answers included in the array (will return 10 notes, 3 and 7 which are uninitialized)
       expect(answer).toEqual(expect.objectContaining(ANSWER_NOTE_DIVINITY));
@@ -429,7 +496,7 @@ describe("E2E Private Oracle", () => {
           .view({ from: requester.getAddress() })
       )
         .map((answerNote: any) => answerNote._value)
-        .map((x: AnswerNote) => AnswerNote.fromChainData(x))[0];
+        .map((x: AnswerNote) => new AnswerNote(x))[0];
 
       // Check: are all answers included in the array (will return 10 notes, 3 and 7 which are uninitialized)
       expect(answer).toEqual(expect.objectContaining(ANSWER_NOTE_REQUESTER));
@@ -445,7 +512,7 @@ describe("E2E Private Oracle", () => {
           .view({ from: requester.getAddress() })
       )
         .map((questionNote: any) => questionNote._value)
-        .map((x: QuestionNote) => QuestionNote.fromChainData(x));
+        .map((x: QuestionNote) => new QuestionNote(x));
 
       const notesWithoutEmpties = requesterRequestsNotes.filter((e, i) => {
         e.shared_nullifier_key !== 0n &&
@@ -471,7 +538,7 @@ describe("E2E Private Oracle", () => {
           .view({ from: requester.getAddress() })
       )
         .map((questionNote: any) => questionNote._value)
-        .map((x: QuestionNote) => QuestionNote.fromChainData(x));
+        .map((x: QuestionNote) => new QuestionNote(x));
 
       const notesWithoutEmpties = divinityRequestsNotes.filter((e, i) => {
         e.shared_nullifier_key !== 0n &&
@@ -504,7 +571,8 @@ describe("E2E Private Oracle", () => {
           requester2.getAddress(),
           QUESTION,
           divinity.getAddress(),
-          nonce
+          nonce,
+          EMPTY_CALLBACK
         )
         .send()
         .wait();
@@ -521,7 +589,7 @@ describe("E2E Private Oracle", () => {
         .wait();
 
       // Check: Compare the note's data with the expected values: the answer is the same as the first one and not the new one
-      const answer: AnswerNote = AnswerNote.fromChainData(
+      const answer: AnswerNote = new AnswerNote(
         await oracle
           .withWallet(requester)
           .methods.get_answer_unconstrained(
@@ -533,6 +601,55 @@ describe("E2E Private Oracle", () => {
 
       // Check: Compare the answer with the expected value
       expect(answer).toEqual(ANSWER_NOTE_REQUESTER);
+    }, 120_000);
+
+    // Test: callback address is correctly called, if provided
+    it("callback is correctly called", async () => {
+      const NEW_REQUEST = 123456n;
+      const NEW_ANSWER = 654321n;
+
+      // Deploy the contract receiving the callback
+      mockCallback = await MockOracleCallbackContract.deploy(deployer)
+        .send()
+        .deployed();
+
+      const nonce = await createAuthEscrowMessage(
+        token,
+        requester,
+        oracle.address,
+        FEE
+      );
+
+      // Submit the question
+      await oracle
+        .withWallet(requester)
+        .methods.submit_question(
+          requester.getAddress(),
+          NEW_REQUEST,
+          divinity.getAddress(),
+          nonce,
+          [mockCallback.address.toBigInt(), ...CALLBACK_DATA]
+        )
+        .send()
+        .wait();
+
+      // Submit the answer
+      await oracle
+        .withWallet(divinity)
+        .methods.submit_answer(NEW_REQUEST, requester.getAddress(), NEW_ANSWER)
+        .send()
+        .wait();
+
+      // Check that the callback has been triggered (see sandbox log too)
+      const _storedCallbackData = await mockCallback
+        .withWallet(requester)
+        .methods.get_received_data()
+        .view();
+
+      expect(Object.values(_storedCallbackData).flat()).toEqual([
+        NEW_ANSWER,
+        ...CALLBACK_DATA,
+      ]);
     }, 120_000);
   });
 
@@ -578,7 +695,8 @@ describe("E2E Private Oracle", () => {
           requester.getAddress(),
           QUESTION,
           divinity.getAddress(),
-          nonce
+          nonce,
+          EMPTY_CALLBACK
         )
         .send()
         .wait();
@@ -675,13 +793,13 @@ describe("E2E Private Oracle", () => {
           .view({ from: requester.getAddress() })
       )
         .map((questionNote: any) => questionNote._value)
-        .map((x: QuestionNote) => QuestionNote.fromChainData(x));
+        .map((x: QuestionNote) => new QuestionNote(x));
 
       // Check: are all questions included in the array (will return 10 notes, 3 and 7 which are uninitialized)
       // Match on the 3 deterministic fields of each note (ie drop the random shared key nullifier)
       type QuestionNoteWithoutRandom = Omit<
         QuestionNote,
-        "shared_nullifier_key"
+        "shared_nullifier_key" | "callback"
       >;
 
       expect(questions).toEqual(
@@ -708,13 +826,13 @@ describe("E2E Private Oracle", () => {
           .view({ from: divinity.getAddress() })
       )
         .map((questionNote: any) => questionNote._value)
-        .map((x: QuestionNote) => QuestionNote.fromChainData(x));
+        .map((x: QuestionNote) => new QuestionNote(x));
 
       // Check: are all questions included in the array (will return 10 notes, 3 and 7 which are uninitialized)
       // Match on the 3 deterministic fields of each note (ie drop the random shared key nullifier)
       type QuestionNoteWithoutRandom = Omit<
         QuestionNote,
-        "shared_nullifier_key"
+        "shared_nullifier_key" | "callback"
       >;
 
       expect(questions).toEqual(
@@ -752,7 +870,7 @@ describe("E2E Private Oracle", () => {
           .view({ from: requester.getAddress() })
       )
         .map((questionNote: any) => questionNote._value)
-        .map((x: QuestionNote) => QuestionNote.fromChainData(x));
+        .map((x: QuestionNote) => new QuestionNote(x));
 
       const questions2: QuestionNote[] = (
         await oracle
@@ -761,7 +879,7 @@ describe("E2E Private Oracle", () => {
           .view({ from: requester.getAddress() })
       )
         .map((questionNote: any) => questionNote._value)
-        .map((x: QuestionNote) => QuestionNote.fromChainData(x));
+        .map((x: QuestionNote) => new QuestionNote(x));
 
       const questions: QuestionNote[] = [...questions1, ...questions2];
 
@@ -779,6 +897,7 @@ describe("E2E Private Oracle", () => {
               request: questionNote.request,
               requester: questionNote.requester,
               divinity: questionNote.divinity,
+              callback: questionNote.callback,
             };
 
             return expect.objectContaining(noteWithoutNullifier);
@@ -838,13 +957,13 @@ describe("E2E Private Oracle", () => {
           .view({ from: requester.getAddress() })
       )
         .map((questionNote: any) => questionNote._value)
-        .map((x: QuestionNote) => QuestionNote.fromChainData(x));
+        .map((x: QuestionNote) => new QuestionNote(x));
 
       // Check: are all questions included in the array (will return 10 notes, 3 and 7 which are uninitialized)
       // Match on the 3 deterministic fields of each note (ie drop the random shared key nullifier)
       type QuestionNoteWithoutRandom = Omit<
         QuestionNote,
-        "shared_nullifier_key"
+        "shared_nullifier_key" | "callback"
       >;
 
       expect(questions).toEqual(
@@ -874,13 +993,13 @@ describe("E2E Private Oracle", () => {
           .view({ from: divinity.getAddress() })
       )
         .map((questionNote: any) => questionNote._value)
-        .map((x: QuestionNote) => QuestionNote.fromChainData(x));
+        .map((x: QuestionNote) => new QuestionNote(x));
 
       // Check: are all questions included in the array (will return 10 notes, 3 and 7 which are uninitialized)
       // Match on the 3 deterministic fields of each note (ie drop the random shared key nullifier)
       type QuestionNoteWithoutRandom = Omit<
         QuestionNote,
-        "shared_nullifier_key"
+        "shared_nullifier_key" | "callback"
       >;
 
       expect(questions).toEqual(
@@ -964,7 +1083,7 @@ describe("E2E Private Oracle", () => {
           .view({ from: requester.getAddress() })
       )
         .map((answerNote: any) => answerNote._value)
-        .map((x: AnswerNote) => AnswerNote.fromChainData(x));
+        .map((x: AnswerNote) => new AnswerNote(x));
 
       // Check: are all answers included in the array (will return 10 notes, 3 and 7 which are uninitialized)
       expect(answer).toEqual(
@@ -981,7 +1100,7 @@ describe("E2E Private Oracle", () => {
           .view({ from: divinity.getAddress() })
       )
         .map((answerNote: any) => answerNote._value)
-        .map((x: AnswerNote) => AnswerNote.fromChainData(x));
+        .map((x: AnswerNote) => new AnswerNote(x));
 
       // Check: Compare the answer with the expected value
       expect(answer).toEqual(
@@ -1043,7 +1162,7 @@ describe("E2E Private Oracle", () => {
     it("get_answer returns the correct answer to the requester", async () => {
       // Get the answer
       // Using "from" authentification (follow https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/pxe/src/pxe_service/pxe_service.ts#L337)
-      const answer: AnswerNote = AnswerNote.fromChainData(
+      const answer: AnswerNote = new AnswerNote(
         await oracle
           .withWallet(requester)
           .methods.get_answer_unconstrained(
@@ -1060,7 +1179,7 @@ describe("E2E Private Oracle", () => {
     it("get_answer returns the correct answer to the divinity", async () => {
       // Get the answer
       // Using "from" authentification (follow https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/pxe/src/pxe_service/pxe_service.ts#L337)
-      const answer: AnswerNote = AnswerNote.fromChainData(
+      const answer: AnswerNote = new AnswerNote(
         await oracle
           .withWallet(divinity)
           .methods.get_answer_unconstrained(
@@ -1137,12 +1256,7 @@ const createAuthEscrowMessage = async (
   const nonce = Fr.random();
 
   // We need to compute the message we want to sign and add it to the wallet as approved
-  const action = token.methods.escrow(
-    from.getAddress(),
-    agent,
-    amount,
-    nonce
-  );
+  const action = token.methods.escrow(from.getAddress(), agent, amount, nonce);
   const messageHash = await computeAuthWitMessageHash(agent, action.request());
 
   // Both wallets are connected to same node and PXE so we could just insert directly using
@@ -1159,13 +1273,20 @@ const createAuthSubmitQuestionMessage = async (
   from: AccountWalletWithPrivateKey,
   question: Fr,
   divinity: AztecAddress,
-  nonce: Fr
+  nonce: Fr,
+  callback: bigint[] = EMPTY_CALLBACK
 ) => {
   // from: AztecAddress, question: Field, divinity_address: AztecAddress, nonce: Field
   // We need to compute the message we want to sign and add it to the wallet as approved
   const action = oracle
     .withWallet(sender)
-    .methods.submit_question(from.getAddress(), question, divinity, nonce);
+    .methods.submit_question(
+      from.getAddress(),
+      question,
+      divinity,
+      nonce,
+      callback
+    );
 
   const messageHash = computeAuthWitMessageHash(
     sender.getAddress(),
@@ -1181,7 +1302,6 @@ const createAuthSubmitQuestionMessage = async (
 
   return action;
 };
-
 
 const addTokenAndFeeNotesToPXE = async (
   requester: AztecAddress,
@@ -1262,12 +1382,7 @@ const sendQuestionsBatch = async (questionNotes: QuestionNote[]) => {
   // Create nonces for token transfer
   const nonces: Fr[] = await Promise.all(
     questionNotes.map((_) =>
-      createAuthEscrowMessage(
-        token,
-        requester,
-        oracle.address,
-        FEE
-      )
+      createAuthEscrowMessage(token, requester, oracle.address, FEE)
     )
   );
 
@@ -1275,7 +1390,13 @@ const sendQuestionsBatch = async (questionNotes: QuestionNote[]) => {
     requester,
     questionNotes.map((questionNote, i) =>
       oracle.methods
-        .submit_question(requester.getAddress(), questionNote.request, divinity.getAddress(), nonces[i])
+        .submit_question(
+          requester.getAddress(),
+          questionNote.request,
+          divinity.getAddress(),
+          nonces[i],
+          EMPTY_CALLBACK
+        )
         .request()
     )
   );
@@ -1304,26 +1425,22 @@ function createCorrectNotes(
   number?: number
 ): [QuestionNote[], AnswerNote[]] {
   return [
-    Array.from({ length: number || 3 }, (_, i) => i).map(
-      (i) => {
-        return QuestionNote.fromLocal({
-          request: QUESTION + BigInt(i),
-          requester_address: requester.getAddress(),
-          divinity_address: divinity.getAddress(),
-          shared_nullifier_key: 0n, // Generated while submitting the question, in the contract
-        });
-      }
-    ),
-    Array.from({ length: number || 3 }, (_, i) => i).map(
-      (i) => {
-        return AnswerNote.fromLocal({
-          request: QUESTION + BigInt(i),
-          answer: ANSWER + BigInt(i),
-          requester: requester.getAddress(),
-          divinity: divinity.getAddress(),
-          owner: owner.getAddress(),
-        });
-      }
-    ),
+    Array.from({ length: number || 3 }, (_, i) => i).map((i) => {
+      return new QuestionNote({
+        request: QUESTION + BigInt(i),
+        requester_address: requester.getAddress(),
+        divinity_address: divinity.getAddress(),
+        shared_nullifier_key: 0n, // Generated while submitting the question, in the contract
+      });
+    }),
+    Array.from({ length: number || 3 }, (_, i) => i).map((i) => {
+      return new AnswerNote({
+        request: QUESTION + BigInt(i),
+        answer: ANSWER + BigInt(i),
+        requester: requester.getAddress(),
+        divinity: divinity.getAddress(),
+        owner: owner.getAddress(),
+      });
+    }),
   ];
 }

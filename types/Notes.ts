@@ -7,31 +7,17 @@ export class AnswerNote {
   divinity: AztecAddress;
   owner: AztecAddress;
 
-  constructor(request: bigint, answer: bigint, requester: AztecAddress, divinity: AztecAddress, owner: AztecAddress) {
-    this.request = request;
-    this.answer = answer;
-    this.requester = requester;
-    this.divinity = divinity;
-    this.owner = owner;
-  }
-
-  static fromChainData(note: any) {
-    return new AnswerNote(
-      note.request,
-      note.answer,
-      AztecAddress.fromBigInt(note.requester.address),
-      AztecAddress.fromBigInt(note.divinity.address),
-      AztecAddress.fromBigInt(note.owner.address),
+  constructor(note: any) {
+    this.request = note.request;
+    this.answer = note.answer;
+    this.requester = AztecAddress.fromBigInt(
+      note.requester.address || note.requester.asBigInt
     );
-  }
-
-  static fromLocal(note: any) {
-    return new AnswerNote(
-      note.request,
-      note.answer,
-      AztecAddress.fromBigInt(note.requester.asBigInt),
-      AztecAddress.fromBigInt(note.divinity.asBigInt),
-      AztecAddress.fromBigInt(note.owner.asBigInt),
+    this.divinity = AztecAddress.fromBigInt(
+      note.divinity.address || note.divinity.asBigInt
+    );
+    this.owner = AztecAddress.fromBigInt(
+      note.owner.address || note.owner.asBigInt
     );
   }
 }
@@ -41,29 +27,17 @@ export class QuestionNote {
   requester: AztecAddress;
   divinity: AztecAddress;
   shared_nullifier_key: bigint;
+  callback: bigint[];
 
-  constructor(request: bigint, requester: AztecAddress, divinity: AztecAddress, shared_nullifier_key: bigint) {
-    this.request = request;
-    this.requester = requester;
-    this.divinity = divinity;
-    this.shared_nullifier_key = shared_nullifier_key;
-  }
-
-  static fromChainData(note: any) {
-    return new QuestionNote(
-      note.request,
-      AztecAddress.fromBigInt(note.requester_address.address),
-      AztecAddress.fromBigInt(note.divinity_address.address),
-      note.shared_nullifier_key,
+  constructor(note: any) {
+    this.request = note.request;
+    this.requester = AztecAddress.fromBigInt(
+      note.requester_address.address || note.requester_address.asBigInt
     );
-  }
-
-  static fromLocal(note: any) {
-    return new QuestionNote(
-      note.request,
-      AztecAddress.fromBigInt(note.requester_address.asBigInt),
-      AztecAddress.fromBigInt(note.divinity_address.asBigInt),
-      note.shared_nullifier_key,
+    this.divinity = AztecAddress.fromBigInt(
+      note.divinity_address.address || note.divinity_address.asBigInt
     );
+    this.shared_nullifier_key = note.shared_nullifier_key;
+    this.callback = note.callback;
   }
 }

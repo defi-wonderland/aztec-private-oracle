@@ -55,6 +55,9 @@ contract PrivateOracle {
         AccountBroadcastEscrowNoteForStruct,
         OwnerBroadcastEscrowNoteForStruct
     };
+    use crate::types::callback::{
+        PrivateOracleCallbackInterface
+    };
 
     use dep::std::option::Option;
 
@@ -157,8 +160,12 @@ contract PrivateOracle {
     }
 
     // Requester submit a question
+    // The nonce is used twice in case this is called by someone else instead of having two different ones.
+    // Once for the authwit of the submit_question
+    // Once for the authwit of the escrow call for the token
+    // The user has to sign the two authwits with the same nonce to make it work
     #[aztec(private)]
-    fn submit_question(from: AztecAddress, question: Field, divinity_address: AztecAddress, nonce: Field) {
+    fn submit_question(from: AztecAddress, question: Field, divinity_address: AztecAddress, nonce: Field, callback: [Field; 6]) {
         if (from.address != context.msg_sender()) {
             assert_current_call_valid_authwit(&mut context, from);
         }
@@ -219,7 +226,8 @@ contract PrivateOracle {
             from, 
             divinity_address,
             random_nullifier_shared_key,
-            escrow_randomness
+            escrow_randomness,
+            callback
         );
 
         // Commit the note in the data tree and send to requester
@@ -251,7 +259,7 @@ contract PrivateOracle {
             .set_limit(1);
         
         // Get the question note
-        let request = storage.questions.get_notes(request_filter)[0];
+        let mut request = storage.questions.get_notes(request_filter)[0];
 
         // Check if the question exists
         assert(!request.is_none());
@@ -299,13 +307,16 @@ contract PrivateOracle {
                 divinity_calling,
                 divinity_calling
             );
-        }
+        } 
 
         // Commit and send both notes
         storage.answers.insert(&mut new_answer_note_for_divinity, true);
         storage.answers.insert(&mut new_answer_note_for_requester, true);
 
         let escrow_randomness = request.unwrap_unchecked().escrow_randomness;
+
+        // Is there a callback address?
+        let callback = request.unwrap_unchecked().callback;
 
         // Nullify the question note (will nullify both divinity and requester notes, via the shared key)
         storage.questions.remove(request.unwrap_unchecked());
@@ -319,6 +330,15 @@ contract PrivateOracle {
             escrow_randomness,
             0
         );
+
+        let mut _target = callback[0];
+
+        if(_target != 0) {
+            let _ = PrivateOracleCallbackInterface::at(_target).trigger_callback(
+                &mut context,
+                answer,
+                callback);
+        }
     }
 
     // Requester consults the answer to one of their questions
@@ -426,7 +446,7 @@ contract PrivateOracle {
     }
 
     // Computes note hash and nullifier.
-    unconstrained fn compute_note_hash_and_nullifier(contract_address: Field, nonce: Field, storage_slot: Field, preimage: [Field; ANSWER_NOTE_LEN]) -> [Field; 4] {
+    unconstrained fn compute_note_hash_and_nullifier(contract_address: Field, nonce: Field, storage_slot: Field, preimage: [Field; QUESTION_NOTE_LEN]) -> [Field; 4] {
         let note_header = NoteHeader::new(contract_address, nonce, storage_slot);
 
         if(storage_slot == PAYMENT_TOKEN_SLOT) {

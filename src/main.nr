@@ -58,8 +58,6 @@ contract PrivateOracle {
         PrivateOracleCallbackInterface
     };
 
-    use dep::aztec::oracle::debug_log::{ debug_log, debug_log_field };
-
     use dep::std::option::Option;
 
     use dep::aztec::context::Context;
@@ -171,8 +169,6 @@ contract PrivateOracle {
             assert_current_call_valid_authwit(&mut context, from);
         }
 
-        debug_log("called submit_question!");
-
         let payment_token = storage.payment_token.get_note().payment_token;
         let fee = storage.fee.get_note().fee;
         let address_this = AztecAddress::new(context.this_address());
@@ -215,10 +211,6 @@ contract PrivateOracle {
         // Store the question in the requester and the divinity notes
         let random_nullifier_shared_key = rand();
 
-        debug_log("before creating the question note");
-
-        debug_log_field(callback[0]);
-
         let mut new_question: QuestionNote = QuestionNote::new(
             question,
             from, 
@@ -227,8 +219,6 @@ contract PrivateOracle {
             escrow_randomness,
             callback
         );
-
-        debug_log("after");
 
         // Commit the note in the data tree and send to requester
         storage.questions.insert(&mut new_question, true);

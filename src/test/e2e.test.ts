@@ -15,10 +15,10 @@ import {
   BatchCall,
 } from "@aztec/aztec.js";
 
-import { TokenContract } from "../token/Token.js";
+import { TokenContract } from "../artifacts/token/Token.js";
 import { MockOracleCallbackContract } from "./MockCallback/interfaces/MockOracleCallback.js";
 
-import { PrivateOracleContract } from "../../interfaces/PrivateOracle.js";
+import { PrivateOracleContract } from "../artifacts/PrivateOracle.js";
 import { AnswerNote, QuestionNote } from "../../types/Notes.js";
 import { initAztecJs } from "@aztec/aztec.js/init";
 
@@ -72,7 +72,7 @@ beforeAll(async () => {
 }, 120_000);
 
 describe("E2E Private Oracle", () => {
-  describe.only("submit_question(..)", () => {
+  describe("submit_question(..)", () => {
     // global scoped to assert accross 'it' blocks
     let shared_key_nullifier_divinity: bigint;
     let shared_key_nullifier_requester: bigint;
@@ -131,7 +131,6 @@ describe("E2E Private Oracle", () => {
         oracle.address,
         FEE
       );
-      console.log(EMPTY_CALLBACK)
       // Submit the question
       const receipt = await oracle
         .withWallet(requester)

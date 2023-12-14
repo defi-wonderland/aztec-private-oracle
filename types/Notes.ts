@@ -11,13 +11,13 @@ export class AnswerNote {
     this.request = note.request;
     this.answer = note.answer;
     this.requester = AztecAddress.fromBigInt(
-      note.requester.address || note.requester.asBigInt
+      note.requester.asBigInt || note.requester.address
     );
     this.divinity = AztecAddress.fromBigInt(
-      note.divinity.address || note.divinity.asBigInt
+      note.divinity.asBigInt || note.divinity.address
     );
     this.owner = AztecAddress.fromBigInt(
-      note.owner.address || note.owner.asBigInt
+      note.owner.asBigInt || note.owner.address
     );
   }
 }
@@ -32,10 +32,10 @@ export class QuestionNote {
   constructor(note: any) {
     this.request = note.request;
     this.requester = AztecAddress.fromBigInt(
-      note.requester_address.address || note.requester_address.asBigInt
+      note.requester_address.asBigInt || note.requester_address.address
     );
     this.divinity = AztecAddress.fromBigInt(
-      note.divinity_address.address || note.divinity_address.asBigInt
+      note.divinity_address.asBigInt || note.divinity_address.address
     );
     this.shared_nullifier_key = note.shared_nullifier_key;
     this.callback = note.callback;

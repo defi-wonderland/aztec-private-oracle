@@ -40,6 +40,8 @@ const MINT_AMOUNT = 100000000n;
 
 const ADDRESS_ZERO = AztecAddress.fromBigInt(0n);
 
+const ZERO_FIELD = new Fr(0n);
+
 const EMPTY_CALLBACK = [0n, 0n, 0n, 0n, 0n, 0n];
 // First element should be replaced by the callback address (submit_question) or the answer (submit_answer)
 const CALLBACK_DATA = [69n, 420n, 42069n, 69420n, 6942069n]; 
@@ -70,7 +72,7 @@ beforeAll(async () => {
 }, 120_000);
 
 describe("E2E Private Oracle", () => {
-  describe("submit_question(..)", () => {
+  describe.only("submit_question(..)", () => {
     // global scoped to assert accross 'it' blocks
     let shared_key_nullifier_divinity: bigint;
     let shared_key_nullifier_requester: bigint;
@@ -129,6 +131,7 @@ describe("E2E Private Oracle", () => {
         oracle.address,
         FEE
       );
+      console.log(EMPTY_CALLBACK)
       // Submit the question
       const receipt = await oracle
         .withWallet(requester)

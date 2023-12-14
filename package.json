@@ -4,7 +4,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "build:contracts": "aztec-cli compile . && aztec-cli generate-typescript .",
+    "build:contracts": "aztec-cli compile . -o './artifacts' -i './artifacts' -ts './artifacts'",
     "build:contracts:mock": "aztec-cli compile ./src/test/MockCallback && aztec-cli generate-typescript ./src/test/MockCallback",
     "test": "yarn build:contracts:mock && yarn build:contracts && NODE_NO_WARNINGS=1 node --experimental-vm-modules $(yarn bin jest) --runInBand --passWithNoTests --testTimeout=30000"
   },
@@ -25,9 +25,9 @@
     "rootDir": "./src"
   },
   "dependencies": {
-    "@aztec/aztec.js": "0.16.7",
-    "@aztec/foundation": "0.16.7",
-    "@aztec/types": "0.16.7",
+    "@aztec/aztec.js": "0.16.9",
+    "@aztec/foundation": "0.16.9",
+    "@aztec/types": "0.16.9",
     "@types/jest": "^29.5.5",
     "jest": "^29.7.0",
     "ts-jest": "^29.1.1",

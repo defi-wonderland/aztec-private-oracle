@@ -15,10 +15,10 @@ import {
   BatchCall,
 } from "@aztec/aztec.js";
 
-import { TokenContract } from "../token/Token.js";
+import { TokenContract } from "../artifacts/token/Token.js";
 import { MockOracleCallbackContract } from "./MockCallback/interfaces/MockOracleCallback.js";
 
-import { PrivateOracleContract } from "../../interfaces/PrivateOracle.js";
+import { PrivateOracleContract } from "../artifacts/PrivateOracle.js";
 import { AnswerNote, QuestionNote } from "../../types/Notes.js";
 import { initAztecJs } from "@aztec/aztec.js/init";
 
@@ -39,6 +39,8 @@ const FEE = 1000n;
 const MINT_AMOUNT = 100000000n;
 
 const ADDRESS_ZERO = AztecAddress.fromBigInt(0n);
+
+const ZERO_FIELD = new Fr(0n);
 
 const EMPTY_CALLBACK = [0n, 0n, 0n, 0n, 0n, 0n];
 // First element should be replaced by the callback address (submit_question) or the answer (submit_answer)

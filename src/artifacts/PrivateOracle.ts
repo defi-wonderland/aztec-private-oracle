@@ -20,7 +20,7 @@ import {
   PublicKey,
   Wallet,
 } from '@aztec/aztec.js';
-import PrivateOracleContractArtifactJson from '../target/PrivateOracle.json' assert { type: 'json' };
+import PrivateOracleContractArtifactJson from './PrivateOracle.json' assert { type: 'json' };
 export const PrivateOracleContractArtifact = PrivateOracleContractArtifactJson as ContractArtifact;
 
 /**

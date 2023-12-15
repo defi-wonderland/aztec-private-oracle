@@ -52,8 +52,7 @@ contract PrivateOracle {
         OwnerEscrowStruct,
         RecipientSettleEscrowStruct,
         OwnerSettleEscrowStruct,
-        AccountBroadcastEscrowNoteForStruct,
-        OwnerBroadcastEscrowNoteForStruct
+        AccountsBroadcastEscrowNoteForStruct
     };
     use crate::types::callback::{
         PrivateOracleCallbackInterface
@@ -175,8 +174,6 @@ contract PrivateOracle {
         let address_this = AztecAddress::new(context.this_address());
         let mut escrow_randomness = 0;
 
- 
-
         if(payment_token.address != 0) {
 
             let token_contract = TokenPrivateContextInterface::at(payment_token.address);
@@ -190,24 +187,17 @@ contract PrivateOracle {
                 nonce
             )[0];
 
-            // Broadcast the escrow to the user
+            // Broadcast the escrow to the user and the divinity
             let _ = token_contract.broadcast_escrow_note_for(
                 &mut context,
-                AccountBroadcastEscrowNoteForStruct { address: from.address },
-                OwnerBroadcastEscrowNoteForStruct { address: address_this.address },
-                fee,
+                [
+                    AccountsBroadcastEscrowNoteForStruct { address: from.address },
+                    AccountsBroadcastEscrowNoteForStruct { address: divinity_address.address },
+                    AccountsBroadcastEscrowNoteForStruct { address: 0 },
+                    AccountsBroadcastEscrowNoteForStruct { address: 0 }
+                ],
                 escrow_randomness
             );
-
-            // Broadcast the escrow to the divinity
-            let _ = token_contract.broadcast_escrow_note_for(
-                &mut context,
-                AccountBroadcastEscrowNoteForStruct { address: divinity_address.address },
-                OwnerBroadcastEscrowNoteForStruct { address: address_this.address },
-                fee,
-                escrow_randomness
-            );
-
         } else {
             assert(false, "Payment token not set");
         }
@@ -247,7 +237,6 @@ contract PrivateOracle {
     #[aztec(private)]
     fn submit_answer(question: Field, requester: AztecAddress, answer: Field) { 
         let payment_token = storage.payment_token.get_note().payment_token;
-        let fee = storage.fee.get_note().fee;
         let divinity_calling = AztecAddress::new(context.msg_sender());
         let address_this = AztecAddress::new(context.this_address());
 
@@ -326,12 +315,11 @@ contract PrivateOracle {
             &mut context,
             OwnerSettleEscrowStruct { address: address_this.address },
             RecipientSettleEscrowStruct { address: divinity_calling.address }, 
-            fee,
             escrow_randomness,
             0
         );
 
-        let mut _target = callback[0];
+        let _target = callback[0];
 
         if(_target != 0) {
             let _ = PrivateOracleCallbackInterface::at(_target).trigger_callback(
@@ -362,7 +350,6 @@ contract PrivateOracle {
     #[aztec(private)]
     fn cancel_question(question: Field) {
         let payment_token = storage.payment_token.get_note().payment_token;
-        let fee = storage.fee.get_note().fee;
         let caller = AztecAddress::new(context.msg_sender());
         let address_this = AztecAddress::new(context.this_address());
 
@@ -380,7 +367,6 @@ contract PrivateOracle {
             &mut context,
             OwnerSettleEscrowStruct { address: address_this.address },
             RecipientSettleEscrowStruct { address: caller.address }, 
-            fee,
             escrow_randomness,
             0
         );

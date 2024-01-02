@@ -1,6 +1,7 @@
 use dep::std;
 use dep::aztec::context::{ PrivateContext, PublicContext };
 use dep::protocol_types::constants::RETURN_VALUES_LENGTH;
+use dep::aztec::selector::compute_selector;
 
 // Interface for calling Token functions from a private context
 struct PrivateOracleCallbackInterface {
@@ -17,20 +18,23 @@ impl PrivateOracleCallbackInterface {
   pub fn trigger_callback(
     self,
     context: &mut PrivateContext,
-    answer: Field,
+    answer: [Field; 3],
     data: [Field; 6]
   ) -> [Field; RETURN_VALUES_LENGTH] {
-    let mut serialized_args = [0; 6];
+    let mut serialized_args = [0; 8];
+    
+    let answer_last = answer.len();
+    for j in 0..answer_last {
+        serialized_args[j] = answer[j];
+    }
 
     // drop the first data element, which is the address (already in self.address)
-    serialized_args[0] = answer;
-    serialized_args[1] = data[1];
-    serialized_args[2] = data[2];
-    serialized_args[3] = data[3];
-    serialized_args[4] = data[4];
-    serialized_args[5] = data[5];
+    for k in 1..data.len() {
+        serialized_args[k + answer_last - 1] = data[k];
+    }
 
-    // Calling the oracle_callback fn:  "oracle_callback(answer: Field, data: [Field; 5])"
-    context.call_private_function(self.address, 0x8853c9d8, serialized_args)
+    // Calling the oracle_callback fn:  "oracle_callback(answer: [Field; 3], data: [Field; 5])"
+    let selector = compute_selector("oracle_callback([Field;3],[Field;5])");
+    context.call_private_function(self.address, selector, serialized_args)
   }
 }

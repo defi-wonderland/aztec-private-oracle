@@ -8,15 +8,15 @@ contract MockOracleCallback {
 
     use dep::aztec::oracle::debug_log::{ debug_log, debug_log_field, debug_log_format };
 
-    global CALLBACK_DATA_LENGTH = 6;
+    global CALLBACK_DATA_LENGTH = 8;
 
     struct Callback_Data {
-        answer: Field,
+        answer: [Field; 3],
         data: [Field; 5],
     }
 
     impl Callback_Data {
-        pub fn new(answer: Field, data: [Field; 5]) -> Self {
+        pub fn new(answer: [Field; 3], data: [Field; 5]) -> Self {
             Callback_Data {
                 answer,
                 data,
@@ -25,14 +25,16 @@ contract MockOracleCallback {
 
         fn deserialize(preimage: [Field; CALLBACK_DATA_LENGTH]) -> Self {
             Callback_Data {
-                answer: preimage[0],
-                data: [preimage[1], preimage[2], preimage[3], preimage[4], preimage[5]]
+                answer: [preimage[0], preimage[1], preimage[2]],
+                data: [preimage[3], preimage[4], preimage[5], preimage[6], preimage[7]]
             }
         }
 
         fn serialize(self) -> [Field; CALLBACK_DATA_LENGTH] {
             [
-                self.answer,
+                self.answer[0],
+                self.answer[1],
+                self.answer[2],
                 self.data[0],
                 self.data[1],
                 self.data[2],
@@ -73,23 +75,21 @@ contract MockOracleCallback {
     }
 
     #[aztec(private)]
-    fn oracle_callback(answer: Field, data: [Field; 5]) {      
+    fn oracle_callback(answer: [Field; 3], data: [Field; 5]) {      
         debug_log("--------------- oracle_callback called ---------------");
-        debug_log_format("answer: {0}", [answer]);
+        debug_log_format("answer: {0} {1} {2}", [answer[0], answer[1], answer[2]]);
         debug_log_format("Data: {0} {1} {2} {3} {4}", [data[0], data[1], data[2], data[3], data[4]]);
         
-        debug_log_format("compute_selector write_received_data(Field,[Field;5]: {0}", [compute_selector("write_received_data(Field,[Field;5])")]);
-
         // Intentional public leak
         context.call_public_function(
             context.this_address(), 
-            compute_selector("write_received_data(Field,[Field;5])"),
+            compute_selector("write_received_data([Field;3],[Field;5])"),
             //0x8403c526,
             serialize_callback_data(Callback_Data::new(answer, data)));
     }
 
     #[aztec(public)]
-    fn write_received_data(answer: Field, data: [Field; 5]) {
+    fn write_received_data(answer: [Field; 3], data: [Field; 5]) {
         storage.data_received.write(Callback_Data::new(answer, data));
     }
 

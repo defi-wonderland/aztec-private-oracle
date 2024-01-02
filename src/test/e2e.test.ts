@@ -585,7 +585,7 @@ describe("E2E Private Oracle", () => {
         .methods.submit_answer(
           QUESTION_NOTE.request,
           requester2.getAddress(),
-          ANSWER_NOTE_REQUESTER.answer + 1n
+          [ANSWER_NOTE_REQUESTER.answer[0] + 1n, ANSWER_NOTE_REQUESTER.answer[1], ANSWER_NOTE_REQUESTER.answer[2]]
         )
         .send()
         .wait();
@@ -608,7 +608,7 @@ describe("E2E Private Oracle", () => {
     // Test: callback address is correctly called, if provided
     it("callback is correctly called", async () => {
       const NEW_REQUEST = 123456n;
-      const NEW_ANSWER = 654321n;
+      const NEW_ANSWER = [654321n, 0n, 0n];
 
       // Deploy the contract receiving the callback
       mockCallback = await MockOracleCallbackContract.deploy(deployer)
@@ -649,7 +649,7 @@ describe("E2E Private Oracle", () => {
         .view();
 
       expect(Object.values(_storedCallbackData).flat()).toEqual([
-        NEW_ANSWER,
+        ...NEW_ANSWER,
         ...CALLBACK_DATA,
       ]);
     }, 120_000);
@@ -1424,10 +1424,10 @@ const sendAnswersBatch = async (answerNotes: AnswerNote[]) => {
 
 function createCorrectNotes(
   owner: AccountWalletWithPrivateKey,
-  number?: number
+  number: number = 3
 ): [QuestionNote[], AnswerNote[]] {
   return [
-    Array.from({ length: number || 3 }, (_, i) => i).map((i) => {
+    Array.from({ length: number }, (_, i) => i).map((i) => {
       return new QuestionNote({
         request: QUESTION + BigInt(i),
         requester_address: requester.getAddress(),
@@ -1435,10 +1435,10 @@ function createCorrectNotes(
         shared_nullifier_key: 0n, // Generated while submitting the question, in the contract
       });
     }),
-    Array.from({ length: number || 3 }, (_, i) => i).map((i) => {
+    Array.from({ length: number }, (_, i) => i).map((i) => {
       return new AnswerNote({
         request: QUESTION + BigInt(i),
-        answer: ANSWER + BigInt(i),
+        answer: [ANSWER + BigInt(i), ANSWER + BigInt(i) + 1n, 0n],
         requester: requester.getAddress(),
         divinity: divinity.getAddress(),
         owner: owner.getAddress(),

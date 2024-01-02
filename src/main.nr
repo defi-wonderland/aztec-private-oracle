@@ -235,7 +235,7 @@ contract PrivateOracle {
 
     // Divinity submit an answer to a given question
     #[aztec(private)]
-    fn submit_answer(question: Field, requester: AztecAddress, answer: Field) { 
+    fn submit_answer(question: Field, requester: AztecAddress, answer: [Field; 3]) { 
         let payment_token = storage.payment_token.get_note().payment_token;
         let divinity_calling = AztecAddress::new(context.msg_sender());
         let address_this = AztecAddress::new(context.this_address());
@@ -256,7 +256,7 @@ contract PrivateOracle {
         // Check if this question was previously answered
         let answerFilter = NoteGetterOptions::new()
             .select(0, question)
-            .select(3, divinity_calling.address)
+            .select(2, divinity_calling.address)
             .set_limit(1);
 
         let stored_answer_note = storage.answers.get_notes(answerFilter)[0];
@@ -332,16 +332,14 @@ contract PrivateOracle {
     // Requester consults the answer to one of their questions
     // Onchain use - see the unconstrained get_answer_unconstrained(..) infra for frontend integration
     #[aztec(private)]
-    fn consult_answer(question: Field) -> Field {
-        let storage = Storage::init(Context::private(&mut context));
+    fn consult_answer(question: Field) -> [Field; 3] {
         let caller = AztecAddress::new(context.msg_sender());
         
         // create the answer_getter_option: select answer and limit
-        let answer_getter_option = NoteGetterOptions::new().select(0, question).select(4, caller.address).set_limit(1);
+        let answer_getter_option = NoteGetterOptions::new().select(0, question).select(3, caller.address).set_limit(1);
 
         // filter the notes - get_notes returns the note **that the account has access to** (if not, add it to the Option)
         let answered_note = storage.answers.get_notes(answer_getter_option)[0].unwrap_unchecked();
-        
         // Return the answer
         answered_note.answer
     }
@@ -402,7 +400,7 @@ contract PrivateOracle {
         // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
 
         // create the filter - limiting to 10 for future compatibility
-        let answer_getter_option = NoteViewerOptions::new().select(4, owner.address).set_offset(start_offset).set_limit(10);
+        let answer_getter_option = NoteViewerOptions::new().select(3, owner.address).set_offset(start_offset).set_limit(10);
 
         // filter the notes and return the answer-
         storage.answers.view_notes(answer_getter_option)
@@ -415,7 +413,7 @@ contract PrivateOracle {
         // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
 
         // create the filter - limiting to 10 for future compatibility
-        let answer_getter_option = NoteViewerOptions::new().select(0, question).select(4, note_owner.address).set_limit(1);
+        let answer_getter_option = NoteViewerOptions::new().select(0, question).select(3, note_owner.address).set_limit(1);
 
         // filter the notes and return the answer-
         storage.answers.view_notes(answer_getter_option)[0].unwrap_unchecked()

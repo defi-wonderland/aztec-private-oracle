@@ -2,7 +2,7 @@ import { AztecAddress, Fr } from "@aztec/aztec.js";
 
 export class AnswerNote {
   request: bigint;
-  answer: bigint;
+  answer: bigint[];
   requester: AztecAddress;
   divinity: AztecAddress;
   owner: AztecAddress;

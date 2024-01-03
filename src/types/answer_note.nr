@@ -18,38 +18,38 @@ use dep::aztec::{
 
 struct AnswerNote {
     request: Field,
-    answer: Field,
     requester: AztecAddress, // Address of the requester
     divinity: AztecAddress, // Address of the divinity
     owner: AztecAddress, // Owner of this answer, either the divinity or the requester
+    answer: [Field; 3],
     header: NoteHeader
 }
 
-global ANSWER_NOTE_LEN: Field = 5;
+global ANSWER_NOTE_LEN: Field = 7;
 
 impl AnswerNote {
-    pub fn new(_request: Field, _answer: Field, _requester: AztecAddress, _divinity: AztecAddress, _owner: AztecAddress) -> Self {
+    pub fn new(_request: Field, _answer: [Field; 3], _requester: AztecAddress, _divinity: AztecAddress, _owner: AztecAddress) -> Self {
         AnswerNote {
             request: _request,
-            answer: _answer,
             requester: _requester,
             divinity: _divinity,
             owner: _owner,
+            answer: _answer,
             header: NoteHeader::empty(),
         }
     }
 
     fn serialize(self) -> [Field; ANSWER_NOTE_LEN] {
-        [self.request, self.answer, self.requester.address, self.divinity.address, self.owner.address]
+        [self.request, self.requester.address, self.divinity.address, self.owner.address, self.answer[0], self.answer[1], self.answer[2]]
     }
 
     fn deserialize(preimage: [Field; ANSWER_NOTE_LEN]) -> Self {
         AnswerNote {
             request: preimage[0],
-            answer: preimage[1],
-            requester: AztecAddress::new(preimage[2]),
-            divinity: AztecAddress::new(preimage[3]),
-            owner: AztecAddress::new(preimage[4]),
+            requester: AztecAddress::new(preimage[1]),
+            divinity: AztecAddress::new(preimage[2]),
+            owner: AztecAddress::new(preimage[3]),
+            answer: [preimage[4], preimage[5], preimage[6]],
             header: NoteHeader::empty(),
         }
     }
@@ -57,10 +57,12 @@ impl AnswerNote {
     fn compute_note_hash(self) -> Field {
         dep::std::hash::pedersen_hash([
             self.request,
-            self.answer,
             self.requester.address,
             self.divinity.address,
-            self.owner.address
+            self.owner.address,
+            self.answer[0],
+            self.answer[1],
+            self.answer[2]
         ])
     }
 

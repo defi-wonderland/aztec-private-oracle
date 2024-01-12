@@ -88,13 +88,13 @@ export class MockOracleCallbackContract extends ContractBase {
     /** get_received_data() */
     get_received_data: (() => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 
-    /** oracle_callback(answer: array, data: array) */
-    oracle_callback: ((answer: FieldLike[], data: FieldLike[]) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
+    /** oracle_callback(answer: array, data: array, divinity: struct) */
+    oracle_callback: ((answer: FieldLike[], data: FieldLike[], divinity: AztecAddressLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 
     /** serialize_callback_data() */
     serialize_callback_data: (() => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 
-    /** write_received_data(answer: array, data: array) */
-    write_received_data: ((answer: FieldLike[], data: FieldLike[]) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
+    /** write_received_data(answer: array, data: array, divinity: struct) */
+    write_received_data: ((answer: FieldLike[], data: FieldLike[], divinity: AztecAddressLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
   };
 }

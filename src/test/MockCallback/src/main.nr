@@ -6,27 +6,32 @@ contract MockOracleCallback {
         types::type_serialization::TypeSerializationInterface
     };
 
+    use dep::aztec::types::address::AztecAddress;
+
     use dep::aztec::oracle::debug_log::{ debug_log, debug_log_field, debug_log_format };
 
-    global CALLBACK_DATA_LENGTH = 8;
+    global CALLBACK_DATA_LENGTH = 9;
 
     struct Callback_Data {
         answer: [Field; 3],
         data: [Field; 5],
+        divinity: AztecAddress
     }
 
     impl Callback_Data {
-        pub fn new(answer: [Field; 3], data: [Field; 5]) -> Self {
+        pub fn new(answer: [Field; 3], data: [Field; 5], divinity: AztecAddress) -> Self {
             Callback_Data {
                 answer,
                 data,
+                divinity
             }
         }
 
         fn deserialize(preimage: [Field; CALLBACK_DATA_LENGTH]) -> Self {
             Callback_Data {
                 answer: [preimage[0], preimage[1], preimage[2]],
-                data: [preimage[3], preimage[4], preimage[5], preimage[6], preimage[7]]
+                data: [preimage[3], preimage[4], preimage[5], preimage[6], preimage[7]],
+                divinity: AztecAddress::new(preimage[8])
             }
         }
 
@@ -40,6 +45,7 @@ contract MockOracleCallback {
                 self.data[2],
                 self.data[3],
                 self.data[4],
+                self.divinity.address
             ]
         }
     }
@@ -75,7 +81,7 @@ contract MockOracleCallback {
     }
 
     #[aztec(private)]
-    fn oracle_callback(answer: [Field; 3], data: [Field; 5]) {      
+    fn oracle_callback(answer: [Field; 3], data: [Field; 5], divinity: AztecAddress) {      
         debug_log("--------------- oracle_callback called ---------------");
         debug_log_format("answer: {0} {1} {2}", [answer[0], answer[1], answer[2]]);
         debug_log_format("Data: {0} {1} {2} {3} {4}", [data[0], data[1], data[2], data[3], data[4]]);
@@ -83,14 +89,14 @@ contract MockOracleCallback {
         // Intentional public leak
         context.call_public_function(
             context.this_address(), 
-            compute_selector("write_received_data([Field;3],[Field;5])"),
+            compute_selector("write_received_data([Field;3],[Field;5],(Field))"),
             //0x8403c526,
-            serialize_callback_data(Callback_Data::new(answer, data)));
+            serialize_callback_data(Callback_Data::new(answer, data, divinity)));
     }
 
     #[aztec(public)]
-    fn write_received_data(answer: [Field; 3], data: [Field; 5]) {
-        storage.data_received.write(Callback_Data::new(answer, data));
+    fn write_received_data(answer: [Field; 3], data: [Field; 5], divinity: AztecAddress) {
+        storage.data_received.write(Callback_Data::new(answer, data, divinity));
     }
 
     unconstrained fn get_received_data() -> Callback_Data {

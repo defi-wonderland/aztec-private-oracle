@@ -325,7 +325,8 @@ contract PrivateOracle {
             let _ = PrivateOracleCallbackInterface::at(_target).trigger_callback(
                 &mut context,
                 answer,
-                callback);
+                callback,
+                divinity_calling);
         }
     }
 

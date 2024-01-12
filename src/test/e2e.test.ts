@@ -651,6 +651,7 @@ describe("E2E Private Oracle", () => {
       expect(Object.values(_storedCallbackData).flat()).toEqual([
         ...NEW_ANSWER,
         ...CALLBACK_DATA,
+        { address: divinity.getAddress().toBigInt() },
       ]);
     }, 120_000);
   });

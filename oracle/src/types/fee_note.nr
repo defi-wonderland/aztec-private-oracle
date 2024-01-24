@@ -5,11 +5,10 @@ use dep::aztec::{
         utils::compute_note_hash_for_read_or_nullify,
     },
     oracle::{
-        get_secret_key::get_secret_key,
         get_public_key::get_public_key,
     },
     context::PrivateContext,
-    types::address::AztecAddress
+    protocol_types::address::AztecAddress
 };
 
 struct FeeNote {
@@ -44,7 +43,11 @@ impl FeeNote {
         ])
     }
 
-    fn compute_nullifier(self) -> Field {
+    fn compute_nullifier(self, _context: &mut PrivateContext) -> Field {
+        self.compute_nullifier_without_context()
+    }
+
+    fn compute_nullifier_without_context(self) -> Field {
         let _ = self; // Avoid compiler warning (same # acir opcodes and backend size)
          0
     }
@@ -73,8 +76,12 @@ fn compute_note_hash(note: FeeNote) -> Field {
     note.compute_note_hash()
 }
 
-fn compute_nullifier(note: FeeNote) -> Field {
-    note.compute_nullifier()
+fn compute_nullifier(note: FeeNote, context: &mut PrivateContext) -> Field {
+    note.compute_nullifier(context)
+}
+
+fn compute_nullifier_without_context(note: FeeNote) -> Field {
+    note.compute_nullifier_without_context()
 }
 
 fn get_header(note: FeeNote) -> NoteHeader {
@@ -94,6 +101,7 @@ global FeeNoteMethods = NoteInterface {
     serialize,
     compute_note_hash,
     compute_nullifier,
+    compute_nullifier_without_context,
     get_header,
     set_header,
     broadcast

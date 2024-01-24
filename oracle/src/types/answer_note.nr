@@ -5,13 +5,11 @@ use dep::aztec::{
         utils::compute_note_hash_for_read_or_nullify,
     },
     oracle::{
-        get_secret_key::get_secret_key,
         get_public_key::get_public_key,
     },
     log::emit_encrypted_log,
     context::PrivateContext,
-    types::{
-        point::Point,
+    protocol_types::{
         address::AztecAddress
     }
 };
@@ -40,26 +38,26 @@ impl AnswerNote {
     }
 
     fn serialize(self) -> [Field; ANSWER_NOTE_LEN] {
-        [self.request, self.requester.address, self.divinity.address, self.owner.address, self.answer[0], self.answer[1], self.answer[2]]
+        [self.request, self.requester.to_field(), self.divinity.to_field(), self.owner.to_field(), self.answer[0], self.answer[1], self.answer[2]]
     }
 
-    fn deserialize(preimage: [Field; ANSWER_NOTE_LEN]) -> Self {
+    pub fn deserialize(preimage: [Field; ANSWER_NOTE_LEN]) -> Self {
         AnswerNote {
             request: preimage[0],
-            requester: AztecAddress::new(preimage[1]),
-            divinity: AztecAddress::new(preimage[2]),
-            owner: AztecAddress::new(preimage[3]),
+            requester: AztecAddress::from_field(preimage[1]),
+            divinity: AztecAddress::from_field(preimage[2]),
+            owner: AztecAddress::from_field(preimage[3]),
             answer: [preimage[4], preimage[5], preimage[6]],
             header: NoteHeader::empty(),
         }
     }
 
-    fn compute_note_hash(self) -> Field {
+    pub fn compute_note_hash(self) -> Field {
         dep::std::hash::pedersen_hash([
             self.request,
-            self.requester.address,
-            self.divinity.address,
-            self.owner.address,
+            self.requester.to_field(),
+            self.divinity.to_field(),
+            self.owner.to_field(),
             self.answer[0],
             self.answer[1],
             self.answer[2]
@@ -69,17 +67,21 @@ impl AnswerNote {
     // No nullifier needed -> only one divinity has access to the original request and the answer cannot change ever
     // still returning a value (instead of assert(false) for instance) as we need it for compute_note_hash_for_read_or_nullify
     // to emit encrypte logs
-    fn compute_nullifier(self) -> Field {
+    pub fn compute_nullifier(self, _context: &mut PrivateContext) -> Field {
+        self.compute_nullifier_without_context()
+    }
+
+    pub fn compute_nullifier_without_context(self) -> Field {
         let _ = self; // Avoid compiler warning (same # acir opcodes and backend size)
         0
     }
 
-    fn set_header(&mut self, header: NoteHeader) {
+    pub fn set_header(&mut self, header: NoteHeader) {
         self.header = header;
     }
 
-    fn broadcast(self, context: &mut PrivateContext, slot: Field) {
-        let encryption_pub_key = get_public_key(self.owner.address);
+    pub fn broadcast(self, context: &mut PrivateContext, slot: Field) {
+        let encryption_pub_key = get_public_key(self.owner);
         emit_encrypted_log(
             context,
             (*context).this_address(),
@@ -102,8 +104,12 @@ fn compute_note_hash(note: AnswerNote) -> Field {
     note.compute_note_hash()
 }
 
-fn compute_nullifier(note: AnswerNote) -> Field {
-    note.compute_nullifier()
+fn compute_nullifier(note: AnswerNote, context: &mut PrivateContext) -> Field {
+    note.compute_nullifier(context)
+}
+
+fn compute_nullifier_without_context(note: AnswerNote) -> Field {
+    note.compute_nullifier_without_context()
 }
 
 fn get_header(note: AnswerNote) -> NoteHeader {
@@ -123,6 +129,7 @@ global AnswerNoteMethods = NoteInterface {
     serialize,
     compute_note_hash,
     compute_nullifier,
+    compute_nullifier_without_context,
     get_header,
     set_header,
     broadcast,

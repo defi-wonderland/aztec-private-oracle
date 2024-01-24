@@ -16,12 +16,15 @@ import {
   EthAddressLike,
   FieldLike,
   Fr,
+  FunctionSelectorLike,
+  loadContractArtifact,
+  NoirCompiledContract,
   Point,
   PublicKey,
   Wallet,
 } from '@aztec/aztec.js';
-import MockOracleCallbackContractArtifactJson from '../target/MockOracleCallback.json' assert { type: 'json' };
-export const MockOracleCallbackContractArtifact = MockOracleCallbackContractArtifactJson as ContractArtifact;
+import MockOracleCallbackContractArtifactJson from '../../../../../target/mock_oracle_callback-MockOracleCallback.json' assert { type: 'json' };
+export const MockOracleCallbackContractArtifact = loadContractArtifact(MockOracleCallbackContractArtifactJson as NoirCompiledContract);
 
 /**
  * Type-safe interface for contract MockOracleCallback;
@@ -56,14 +59,14 @@ export class MockOracleCallbackContract extends ContractBase {
    * Creates a tx to deploy a new instance of this contract.
    */
   public static deploy(wallet: Wallet, ) {
-    return new DeployMethod<MockOracleCallbackContract>(Point.ZERO, wallet, MockOracleCallbackContractArtifact, Array.from(arguments).slice(1));
+    return new DeployMethod<MockOracleCallbackContract>(Point.ZERO, wallet, MockOracleCallbackContractArtifact, MockOracleCallbackContract.at, Array.from(arguments).slice(1));
   }
 
   /**
    * Creates a tx to deploy a new instance of this contract using the specified public key to derive the address.
    */
   public static deployWithPublicKey(publicKey: PublicKey, wallet: Wallet, ) {
-    return new DeployMethod<MockOracleCallbackContract>(publicKey, wallet, MockOracleCallbackContractArtifact, Array.from(arguments).slice(2));
+    return new DeployMethod<MockOracleCallbackContract>(publicKey, wallet, MockOracleCallbackContractArtifact, MockOracleCallbackContract.at, Array.from(arguments).slice(2));
   }
   
 
@@ -79,22 +82,22 @@ export class MockOracleCallbackContract extends ContractBase {
   /** Type-safe wrappers for the public methods exposed by the contract. */
   public methods!: {
     
-    /** compute_note_hash_and_nullifier(contract_address: field, nonce: field, storage_slot: field, serialized_note: array) */
-    compute_note_hash_and_nullifier: ((contract_address: FieldLike, nonce: FieldLike, storage_slot: FieldLike, serialized_note: FieldLike[]) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
-
-    /** deserialize_callback_data() */
-    deserialize_callback_data: (() => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
+    /** oracle_callback(answer: array, data: array, divinity: struct) */
+    oracle_callback: ((answer: FieldLike[], data: FieldLike[], divinity: AztecAddressLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 
     /** get_received_data() */
     get_received_data: (() => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 
-    /** oracle_callback(answer: array, data: array, divinity: struct) */
-    oracle_callback: ((answer: FieldLike[], data: FieldLike[], divinity: AztecAddressLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
-
     /** serialize_callback_data() */
     serialize_callback_data: (() => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 
+    /** deserialize_callback_data() */
+    deserialize_callback_data: (() => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
+
     /** write_received_data(answer: array, data: array, divinity: struct) */
     write_received_data: ((answer: FieldLike[], data: FieldLike[], divinity: AztecAddressLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
+
+    /** compute_note_hash_and_nullifier(contract_address: struct, nonce: field, storage_slot: field, serialized_note: array) */
+    compute_note_hash_and_nullifier: ((contract_address: AztecAddressLike, nonce: FieldLike, storage_slot: FieldLike, serialized_note: FieldLike[]) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
   };
 }

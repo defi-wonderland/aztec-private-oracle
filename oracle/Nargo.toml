@@ -1,5 +1,8 @@
-[workspace]
-members = ["oracle/", "oracle/src/test/MockCallback"]
+[package]
+name = "privateoracle"
+type = "contract"
+authors = ["wonderland"]
+compiler_version = ">=0.18.0"
 
 [dependencies]
 aztec = { git="https://github.com/AztecProtocol/aztec-packages/", tag="aztec-packages-v0.20.0", directory="yarn-project/aztec-nr/aztec" }

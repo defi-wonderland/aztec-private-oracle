@@ -1,8 +1,10 @@
 use dep::std;
 use dep::aztec::context::{ PrivateContext, PublicContext };
-use dep::protocol_types::constants::RETURN_VALUES_LENGTH;
-use dep::aztec::selector::compute_selector;
-use dep::aztec::types::address::AztecAddress;
+use dep::aztec::protocol_types::{
+    address::AztecAddress,
+    constants::RETURN_VALUES_LENGTH,
+    abis::function_selector::FunctionSelector,
+};
 
 // Interface for calling Token functions from a private context
 struct PrivateOracleCallbackInterface {
@@ -35,10 +37,10 @@ impl PrivateOracleCallbackInterface {
         serialized_args[k + answer_last - 1] = data[k];
     }
 
-    serialized_args[8] = divinity.address;
+    serialized_args[8] = divinity.to_field();
 
     // Calling the oracle_callback fn:  "oracle_callback(answer: [Field; 3], data: [Field; 5])"
-    let selector = compute_selector("oracle_callback([Field;3],[Field;5],(Field))");
-    context.call_private_function(self.address, selector, serialized_args)
+    let selector = FunctionSelector::from_signature("oracle_callback([Field;3],[Field;5],(Field))");
+    context.call_private_function(AztecAddress::from_field(self.address), selector, serialized_args)
   }
 }

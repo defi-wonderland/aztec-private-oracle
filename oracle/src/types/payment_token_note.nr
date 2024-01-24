@@ -5,13 +5,11 @@ use dep::aztec::{
         utils::compute_note_hash_for_read_or_nullify,
     },
     oracle::{
-        get_secret_key::get_secret_key,
         get_public_key::get_public_key,
     },
     log::emit_encrypted_log,
     context::PrivateContext,
-    types::{
-        point::Point,
+    protocol_types::{
         address::AztecAddress
     }
 };
@@ -32,23 +30,27 @@ impl PaymentTokenNote {
     }
 
     fn serialize(self) -> [Field; PAYMENT_TOKEN_NOTE_LEN] {
-        [self.payment_token.address]
+        [self.payment_token.to_field()]
     }
 
     fn deserialize(preimage: [Field; PAYMENT_TOKEN_NOTE_LEN]) -> Self {
         PaymentTokenNote {
-            payment_token: AztecAddress::new(preimage[0]),
+            payment_token: AztecAddress::from_field(preimage[0]),
             header: NoteHeader::empty(),
         }
     }
 
     fn compute_note_hash(self) -> Field {
         dep::std::hash::pedersen_hash([
-            self.payment_token.address
+            self.payment_token.to_field()
         ])
     }
 
-    fn compute_nullifier(self) -> Field {
+    fn compute_nullifier(self, _context: &mut PrivateContext) -> Field {
+        self.compute_nullifier_without_context()
+    }
+
+    fn compute_nullifier_without_context(self) -> Field {
         let _ = self; // Avoid compiler warning (same # acir opcodes and backend size)
          0
     }
@@ -76,8 +78,12 @@ fn compute_note_hash(note: PaymentTokenNote) -> Field {
     note.compute_note_hash()
 }
 
-fn compute_nullifier(note: PaymentTokenNote) -> Field {
-    note.compute_nullifier()
+fn compute_nullifier(note: PaymentTokenNote, context: &mut PrivateContext) -> Field {
+    note.compute_nullifier(context)
+}
+
+fn compute_nullifier_without_context(note: PaymentTokenNote) -> Field {
+    note.compute_nullifier_without_context()
 }
 
 fn get_header(note: PaymentTokenNote) -> NoteHeader {
@@ -97,6 +103,7 @@ global PaymentTokenNoteMethods = NoteInterface {
     serialize,
     compute_note_hash,
     compute_nullifier,
+    compute_nullifier_without_context,
     get_header,
     set_header,
     broadcast

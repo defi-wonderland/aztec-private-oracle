@@ -2,11 +2,13 @@ contract MockOracleCallback {
     use dep::aztec::{
         context::{PrivateContext, PublicContext, Context},
         state_vars::public_state::PublicState,
-        selector::compute_selector,
         types::type_serialization::TypeSerializationInterface
     };
 
-    use dep::aztec::types::address::AztecAddress;
+    use dep::aztec::protocol_types::{
+        address::AztecAddress,
+        abis::function_selector::FunctionSelector,
+    };
 
     use dep::aztec::oracle::debug_log::{ debug_log, debug_log_field, debug_log_format };
 
@@ -31,7 +33,7 @@ contract MockOracleCallback {
             Callback_Data {
                 answer: [preimage[0], preimage[1], preimage[2]],
                 data: [preimage[3], preimage[4], preimage[5], preimage[6], preimage[7]],
-                divinity: AztecAddress::new(preimage[8])
+                divinity: AztecAddress::from_field(preimage[8])
             }
         }
 
@@ -45,7 +47,7 @@ contract MockOracleCallback {
                 self.data[2],
                 self.data[3],
                 self.data[4],
-                self.divinity.address
+                self.divinity.to_field()
             ]
         }
     }
@@ -89,7 +91,7 @@ contract MockOracleCallback {
         // Intentional public leak
         context.call_public_function(
             context.this_address(), 
-            compute_selector("write_received_data([Field;3],[Field;5],(Field))"),
+            FunctionSelector::from_signature("write_received_data([Field;3],[Field;5],(Field))"),
             //0x8403c526,
             serialize_callback_data(Callback_Data::new(answer, data, divinity)));
     }
@@ -99,11 +101,11 @@ contract MockOracleCallback {
         storage.data_received.write(Callback_Data::new(answer, data, divinity));
     }
 
-    unconstrained fn get_received_data() -> Callback_Data {
+    unconstrained fn get_received_data() -> pub Callback_Data {
         storage.data_received.read()
     }
 
-    unconstrained fn compute_note_hash_and_nullifier(contract_address: Field, nonce: Field, storage_slot: Field, serialized_note: [Field; 0]) -> [Field; 4] {
+    unconstrained fn compute_note_hash_and_nullifier(contract_address: AztecAddress, nonce: Field, storage_slot: Field, serialized_note: [Field; 0]) -> pub [Field; 4] {
         [0,0,0,0]
     }
 }

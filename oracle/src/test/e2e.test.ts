@@ -2,10 +2,8 @@ import {
   Fr,
   PXE,
   computeMessageSecretHash,
-  createAccount,
   createPXEClient,
-  getSandboxAccountsWallets,
-  waitForSandbox,
+  waitForPXE,
   AztecAddress,
   AccountWalletWithPrivateKey,
   computeAuthWitMessageHash,
@@ -13,19 +11,17 @@ import {
   ExtendedNote,
   Note,
   BatchCall,
+  AccountWallet,
+  CompleteAddress,
 } from "@aztec/aztec.js";
 
-import { TokenContract } from "../artifacts/token/Token.js";
+import { createAccount, getInitialTestAccountsWallets } from "@aztec/accounts/testing"
+
+import { TokenContract } from "../../artifacts/Token.js";
 import { MockOracleCallbackContract } from "./MockCallback/interfaces/MockOracleCallback.js";
 
-import { PrivateOracleContract } from "../artifacts/PrivateOracle.js";
-import { AnswerNote, QuestionNote } from "../../types/Notes.js";
-import { initAztecJs } from "@aztec/aztec.js/init";
-
-const {
-  SANDBOX_URL = "http://localhost:8080",
-  ETHEREUM_HOST = "http://localhost:8545",
-} = process.env;
+import { PrivateOracleContract } from "../../artifacts/PrivateOracle.js";
+import { AnswerNote, QuestionNote } from "../../../types/Notes.js";
 
 const PAYMENT_TOKEN_SLOT: Fr = new Fr(1);
 const FEE_SLOT: Fr = new Fr(2);
@@ -57,18 +53,20 @@ let requester2: AccountWalletWithPrivateKey;
 let divinity: AccountWalletWithPrivateKey;
 let deployer: AccountWalletWithPrivateKey;
 
+const setupSandbox = async () => {
+  const { PXE_URL = 'http://localhost:8080' } = process.env;
+  const pxe = createPXEClient(PXE_URL);
+  await waitForPXE(pxe);
+  return pxe;
+};
+
 // Setup: Set the sandbox
 beforeAll(async () => {
-  const { SANDBOX_URL = "http://localhost:8080" } = process.env;
-  pxe = createPXEClient(SANDBOX_URL);
+  pxe = await setupSandbox();
 
-  await initAztecJs();
-
-  [, [requester, requester2, divinity], deployer] = await Promise.all([
-    waitForSandbox(pxe),
-    getSandboxAccountsWallets(pxe),
-    createAccount(pxe),
-  ]);
+  [requester, requester2, divinity] = await getInitialTestAccountsWallets(pxe);
+  // getInitialTestAccountWallets only returns three accounts, so we need to create a fourth
+  deployer = await createAccount(pxe)
 }, 120_000);
 
 describe("E2E Private Oracle", () => {
@@ -86,7 +84,7 @@ describe("E2E Private Oracle", () => {
       QUESTION_NOTE = createCorrectNotes(requester)[0][0];
 
       // Deploy the token
-      token = await TokenContract.deploy(deployer, requester.getAddress())
+      token = await TokenContract.deploy(deployer, requester.getCompleteAddress())
         .send()
         .deployed();
 
@@ -651,7 +649,7 @@ describe("E2E Private Oracle", () => {
       expect(Object.values(_storedCallbackData).flat()).toEqual([
         ...NEW_ANSWER,
         ...CALLBACK_DATA,
-        { address: divinity.getAddress().toBigInt() },
+        { inner: divinity.getAddress().toBigInt() },
       ]);
     }, 120_000);
   });
@@ -1230,8 +1228,7 @@ describe("E2E Private Oracle", () => {
 
     it("returns the correct token address", async () => {
       let storedTokenAddress = await oracle.methods.get_payment_token().view();
-
-      expect(AztecAddress.fromBigInt(storedTokenAddress.address)).toEqual(
+      expect(AztecAddress.fromBigInt(storedTokenAddress)).toEqual(
         token.address
       );
     });

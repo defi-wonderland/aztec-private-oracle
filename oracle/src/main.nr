@@ -75,17 +75,18 @@ contract PrivateOracle {
     };
     use dep::aztec::state_vars::{
         public_state::PublicState,
-        map::Map,
         set::Set,
         singleton::Singleton,
         immutable_singleton::ImmutableSingleton
     };
-    use dep::aztec::selector::compute_selector;
 
     use dep::aztec::types::type_serialization::field_serialization::{ FieldSerializationMethods, FIELD_SERIALIZED_LEN};
-    use dep::aztec::types::type_serialization::aztec_address_serialization::{AztecAddressSerializationMethods, AZTEC_ADDRESS_SERIALIZED_LEN};
+    use dep::aztec::types::type_serialization::address_serialization::{AddressSerializationMethods, AZTEC_ADDRESS_SERIALIZED_LEN};
     
-    use dep::aztec::types::address::AztecAddress;
+    use dep::aztec::protocol_types::{
+        address::AztecAddress,
+        abis::function_selector::FunctionSelector,
+    };
 
     use dep::authwit::{
         auth::{
@@ -128,7 +129,7 @@ contract PrivateOracle {
                 answers: Set::new(context, ANSWER_SET_SLOT, AnswerNoteMethods),
                 
                 // -- Public --
-                payment_token_public: PublicState::new(context, PAYMENT_TOKEN_PUBLIC_SLOT, AztecAddressSerializationMethods),
+                payment_token_public: PublicState::new(context, PAYMENT_TOKEN_PUBLIC_SLOT, AddressSerializationMethods),
                 fee_public: PublicState::new(context, FEE_PUBLIC_SLOT, FieldSerializationMethods)
             }
         }
@@ -143,8 +144,8 @@ contract PrivateOracle {
         let mut fee_note = FeeNote::new(fee);
         storage.fee.initialize(&mut fee_note, Option::none(), false);
         
-        let selector = compute_selector("initialize_payment_token(Field,Field)");
-        context.call_public_function(context.this_address(), selector, [payment_token.address, fee]);
+        let selector = FunctionSelector::from_signature("initialize_payment_token(Field,Field)");
+        context.call_public_function(context.this_address(), selector, [payment_token.to_field(), fee]);
     }
 
     // Update the payment token and fee getters
@@ -152,37 +153,37 @@ contract PrivateOracle {
     fn initialize_payment_token(payment_token: Field, fee: Field) {
         assert(context.msg_sender() == context.this_address());
 
-        let _payment_token = AztecAddress::new(payment_token);
+        let _payment_token = AztecAddress::from_field(payment_token);
 
         storage.payment_token_public.write(_payment_token);
         storage.fee_public.write(fee);
     }
 
-    // Requester submit a question
+    // Requester submit a questionFromEscrowStruct
     // The nonce is used twice in case this is called by someone else instead of having two different ones.
     // Once for the authwit of the submit_question
     // Once for the authwit of the escrow call for the token
     // The user has to sign the two authwits with the same nonce to make it work
     #[aztec(private)]
     fn submit_question(from: AztecAddress, question: Field, divinity_address: AztecAddress, nonce: Field, callback: [Field; 6]) {
-        if (from.address != context.msg_sender()) {
+        if (!from.eq(context.msg_sender())) {
             assert_current_call_valid_authwit(&mut context, from);
         }
 
         let payment_token = storage.payment_token.get_note().payment_token;
         let fee = storage.fee.get_note().fee;
-        let address_this = AztecAddress::new(context.this_address());
+        let address_this = context.this_address();
         let mut escrow_randomness = 0;
 
-        if(payment_token.address != 0) {
+        if(payment_token.to_field() != 0) {
 
-            let token_contract = TokenPrivateContextInterface::at(payment_token.address);
+            let token_contract = TokenPrivateContextInterface::at(payment_token);
 
             // Take the payment from the user
             escrow_randomness = token_contract.escrow(
                 &mut context,
-                FromEscrowStruct { address: from.address },
-                OwnerEscrowStruct { address: address_this.address },
+                FromEscrowStruct { inner: from.to_field() },
+                OwnerEscrowStruct { inner: address_this.to_field() },
                 fee,
                 nonce
             )[0];
@@ -191,10 +192,10 @@ contract PrivateOracle {
             let _ = token_contract.broadcast_escrow_note_for(
                 &mut context,
                 [
-                    AccountsBroadcastEscrowNoteForStruct { address: from.address },
-                    AccountsBroadcastEscrowNoteForStruct { address: divinity_address.address },
-                    AccountsBroadcastEscrowNoteForStruct { address: 0 },
-                    AccountsBroadcastEscrowNoteForStruct { address: 0 }
+                    AccountsBroadcastEscrowNoteForStruct { inner: from.to_field() },
+                    AccountsBroadcastEscrowNoteForStruct { inner: divinity_address.to_field() },
+                    AccountsBroadcastEscrowNoteForStruct { inner: 0 },
+                    AccountsBroadcastEscrowNoteForStruct { inner: 0 }
                 ],
                 escrow_randomness
             );
@@ -203,7 +204,7 @@ contract PrivateOracle {
         }
 
         // Assert if question doesn't already exist from the same requester
-        let question_getter_option = NoteGetterOptions::new().select(0, question).select(1, from.address).set_limit(1);
+        let question_getter_option = NoteGetterOptions::new().select(0, question).select(1, from.to_field()).set_limit(1);
         let question_note = storage.questions.get_notes(question_getter_option)[0];
 
         assert(question_note.is_none());
@@ -226,9 +227,9 @@ contract PrivateOracle {
         // Encrypt/send the question in the divinity notes
         emit_encrypted_log(
             &mut context,
-            address_this.address,
+            address_this,
             QUESTION_SET_SLOT,
-            get_public_key(divinity_address.address),
+            get_public_key(divinity_address),
             new_question.serialize(),
         ); 
     }
@@ -237,14 +238,14 @@ contract PrivateOracle {
     #[aztec(private)]
     fn submit_answer(question: Field, requester: AztecAddress, answer: [Field; 3]) { 
         let payment_token = storage.payment_token.get_note().payment_token;
-        let divinity_calling = AztecAddress::new(context.msg_sender());
-        let address_this = AztecAddress::new(context.this_address());
+        let divinity_calling = context.msg_sender();
+        let address_this = context.this_address();
 
         // Filter request note to check if existing and accesible for this divinity
         let request_filter = NoteGetterOptions::new()
             .select(0, question)
-            .select(1, requester.address)
-            .select(2, divinity_calling.address)
+            .select(1, requester.to_field())
+            .select(2, divinity_calling.to_field())
             .set_limit(1);
         
         // Get the question note
@@ -256,7 +257,7 @@ contract PrivateOracle {
         // Check if this question was previously answered
         let answerFilter = NoteGetterOptions::new()
             .select(0, question)
-            .select(2, divinity_calling.address)
+            .select(2, divinity_calling.to_field())
             .set_limit(1);
 
         let stored_answer_note = storage.answers.get_notes(answerFilter)[0];
@@ -311,10 +312,10 @@ contract PrivateOracle {
         storage.questions.remove(request.unwrap_unchecked());
 
         // Pay the divinity
-        let _ = TokenPrivateContextInterface::at(payment_token.address).settle_escrow(
+        let _ = TokenPrivateContextInterface::at(payment_token).settle_escrow(
             &mut context,
-            OwnerSettleEscrowStruct { address: address_this.address },
-            RecipientSettleEscrowStruct { address: divinity_calling.address }, 
+            OwnerSettleEscrowStruct { inner: address_this.to_field() },
+            RecipientSettleEscrowStruct { inner: divinity_calling.to_field() }, 
             escrow_randomness,
             0
         );
@@ -334,10 +335,10 @@ contract PrivateOracle {
     // Onchain use - see the unconstrained get_answer_unconstrained(..) infra for frontend integration
     #[aztec(private)]
     fn consult_answer(question: Field) -> [Field; 3] {
-        let caller = AztecAddress::new(context.msg_sender());
+        let caller = context.msg_sender();
         
         // create the answer_getter_option: select answer and limit
-        let answer_getter_option = NoteGetterOptions::new().select(0, question).select(3, caller.address).set_limit(1);
+        let answer_getter_option = NoteGetterOptions::new().select(0, question).select(3, caller.to_field()).set_limit(1);
 
         // filter the notes - get_notes returns the note **that the account has access to** (if not, add it to the Option)
         let answered_note = storage.answers.get_notes(answer_getter_option)[0].unwrap_unchecked();
@@ -349,11 +350,11 @@ contract PrivateOracle {
     #[aztec(private)]
     fn cancel_question(question: Field) {
         let payment_token = storage.payment_token.get_note().payment_token;
-        let caller = AztecAddress::new(context.msg_sender());
-        let address_this = AztecAddress::new(context.this_address());
+        let caller = context.msg_sender();
+        let address_this = context.this_address();
 
         // create the Answer_getter_option: SELECT by address and max number of requests
-        let question_getter_option = NoteGetterOptions::new().select(0, question).select(1, caller.address).set_limit(1);
+        let question_getter_option = NoteGetterOptions::new().select(0, question).select(1, caller.to_field()).set_limit(1);
         let question_note = storage.questions.get_notes(question_getter_option)[0].unwrap_unchecked();
 
         let escrow_randomness = question_note.escrow_randomness;
@@ -362,46 +363,58 @@ contract PrivateOracle {
         storage.questions.remove(question_note);
 
         // Return funds to user
-        let _ = TokenPrivateContextInterface::at(payment_token.address).settle_escrow(
+        let _ = TokenPrivateContextInterface::at(payment_token).settle_escrow(
             &mut context,
-            OwnerSettleEscrowStruct { address: address_this.address },
-            RecipientSettleEscrowStruct { address: caller.address }, 
+            OwnerSettleEscrowStruct { inner: address_this.to_field() },
+            RecipientSettleEscrowStruct { inner: caller.to_field() }, 
             escrow_randomness,
             0
         );
     }
 
+    // Return the oracle fee
+    #[aztec(private)]
+    fn get_private_fee() -> Field {
+        storage.fee.get_note().fee
+    }
+
+    // Return the payment token
+    #[aztec(private)]
+    fn get_private_payment_token() -> AztecAddress {
+        storage.payment_token.get_note().payment_token
+    }
+
     // Return all questions from a given requester that the caller can decrypt (max 10 for now)
-    unconstrained fn get_questions_unconstrained(requester: AztecAddress, start_offset: u32) -> [Option<QuestionNote>; 10] {
+    unconstrained fn get_questions_unconstrained(requester: AztecAddress, start_offset: u32) -> pub [Option<QuestionNote>; 10] {
         // MAX_NOTES_PER_PAGE == 10
         // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
 
         // create the filter - limiting to 10 for future compatibility
-        let question_getter_option = NoteViewerOptions::new().select(1, requester.address).set_offset(start_offset).set_limit(10);
+        let question_getter_option = NoteViewerOptions::new().select(1, requester.to_field()).set_offset(start_offset).set_limit(10);
 
         // filter the notes and return the answer-
         storage.questions.view_notes(question_getter_option)
     }
 
     // Returns the questions pending to answer for a given divinity
-    unconstrained fn get_pending_questions_unconstrained(divinity: AztecAddress, start_offset: u32) -> [Option<QuestionNote>; 10] {
+    unconstrained fn get_pending_questions_unconstrained(divinity: AztecAddress, start_offset: u32) -> pub [Option<QuestionNote>; 10] {
         // MAX_NOTES_PER_PAGE == 10
         // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
 
         // create the filter - limiting to 10 for future compatibility
-        let question_getter_option = NoteViewerOptions::new().select(2, divinity.address).set_offset(start_offset).set_limit(10);
+        let question_getter_option = NoteViewerOptions::new().select(2, divinity.to_field()).set_offset(start_offset).set_limit(10);
 
         // filter the notes and return the answer-
         storage.questions.view_notes(question_getter_option)
     }
 
     // Returns the questions answered owned by a given address
-    unconstrained fn get_answers_unconstrained(owner: AztecAddress, start_offset: u32) -> [Option<AnswerNote>; 10] {
+    unconstrained fn get_answers_unconstrained(owner: AztecAddress, start_offset: u32) -> pub [Option<AnswerNote>; 10] {
         // MAX_NOTES_PER_PAGE == 10
         // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
 
         // create the filter - limiting to 10 for future compatibility
-        let answer_getter_option = NoteViewerOptions::new().select(3, owner.address).set_offset(start_offset).set_limit(10);
+        let answer_getter_option = NoteViewerOptions::new().select(3, owner.to_field()).set_offset(start_offset).set_limit(10);
 
         // filter the notes and return the answer-
         storage.answers.view_notes(answer_getter_option)
@@ -409,29 +422,29 @@ contract PrivateOracle {
 
     // Get the answer to a question - unconstrained. Returns all answers to the same questions, from all the divinities
     // Obviously, only the question from the sender can be read
-    unconstrained fn get_answer_unconstrained(question: Field, note_owner: AztecAddress) -> AnswerNote {
+    unconstrained fn get_answer_unconstrained(question: Field, note_owner: AztecAddress) -> pub AnswerNote {
         // MAX_NOTES_PER_PAGE == 10
         // https://github.com/AztecProtocol/aztec-packages/blob/2d498b352364debf59af940f0a69c453651a4ad0/yarn-project/aztec-nr/aztec/src/constants_gen.nr#L53
 
         // create the filter - limiting to 10 for future compatibility
-        let answer_getter_option = NoteViewerOptions::new().select(0, question).select(3, note_owner.address).set_limit(1);
+        let answer_getter_option = NoteViewerOptions::new().select(0, question).select(3, note_owner.to_field()).set_limit(1);
 
         // filter the notes and return the answer-
         storage.answers.view_notes(answer_getter_option)[0].unwrap_unchecked()
     }
 
     // Returns the fee
-    unconstrained fn get_fee() -> Field {
+    unconstrained fn get_fee() -> pub Field {
         storage.fee_public.read()
     }
 
     // Returns the payment token
-    unconstrained fn get_payment_token() -> AztecAddress {
-        storage.payment_token_public.read()
+    unconstrained fn get_payment_token() -> pub Field {
+        storage.payment_token_public.read().to_field()
     }
 
     // Computes note hash and nullifier.
-    unconstrained fn compute_note_hash_and_nullifier(contract_address: Field, nonce: Field, storage_slot: Field, preimage: [Field; QUESTION_NOTE_LEN]) -> [Field; 4] {
+    unconstrained fn compute_note_hash_and_nullifier(contract_address: AztecAddress, nonce: Field, storage_slot: Field, preimage: [Field; QUESTION_NOTE_LEN]) -> pub [Field; 4] {
         let note_header = NoteHeader::new(contract_address, nonce, storage_slot);
 
         if(storage_slot == PAYMENT_TOKEN_SLOT) {

@@ -5,13 +5,11 @@ use dep::aztec::{
         utils::compute_note_hash_for_read_or_nullify,
     },
     oracle::{
-        get_secret_key::get_secret_key,
         get_public_key::get_public_key,
     },
     log::emit_encrypted_log,
     context::PrivateContext,
-    types::{
-        point::Point,
+    protocol_types::{
         address::AztecAddress
     }
 };
@@ -57,15 +55,15 @@ impl QuestionNote {
 
     }
 
-    fn serialize(self) -> [Field; QUESTION_NOTE_LEN] {
-        [self.request, self.requester_address.address, self.divinity_address.address, self.shared_nullifier_key, self.escrow_randomness, self.callback[0], self.callback[1], self.callback[2], self.callback[3], self.callback[4], self.callback[5]]
+    pub fn serialize(self) -> [Field; QUESTION_NOTE_LEN] {
+        [self.request, self.requester_address.to_field(), self.divinity_address.to_field(), self.shared_nullifier_key, self.escrow_randomness, self.callback[0], self.callback[1], self.callback[2], self.callback[3], self.callback[4], self.callback[5]]
     }
 
-    fn deserialize(preimage: [Field; QUESTION_NOTE_LEN]) -> Self {
+    pub fn deserialize(preimage: [Field; QUESTION_NOTE_LEN]) -> Self {
         QuestionNote {
             request: preimage[0],
-            requester_address: AztecAddress::new(preimage[1]),
-            divinity_address: AztecAddress::new(preimage[2]),
+            requester_address: AztecAddress::from_field(preimage[1]),
+            divinity_address: AztecAddress::from_field(preimage[2]),
             shared_nullifier_key: preimage[3], 
             escrow_randomness: preimage[4],
             callback: [preimage[5], preimage[6], preimage[7], preimage[8], preimage[9], preimage[10]],
@@ -73,11 +71,15 @@ impl QuestionNote {
         }
     }
 
-    fn compute_note_hash(self) -> Field {
+    pub fn compute_note_hash(self) -> Field {
         dep::std::hash::pedersen_hash(serialize(self))
     }
 
-    fn compute_nullifier(self) -> Field {
+    pub fn compute_nullifier(self, _context: &mut PrivateContext) -> Field {
+        self.compute_nullifier_without_context()
+    }
+
+    pub fn compute_nullifier_without_context(self) -> Field {
         let note_hash_for_nullify = compute_note_hash_for_read_or_nullify(QuestionNoteMethods, self);
         let nullifier_key = self.shared_nullifier_key;
 
@@ -87,13 +89,13 @@ impl QuestionNote {
         ])
     }
 
-    fn set_header(&mut self, header: NoteHeader) {
+    pub fn set_header(&mut self, header: NoteHeader) {
         self.header = header;
     }
 
     // Broadcasts the note as an encrypted log on L1.
-    fn broadcast(self, context: &mut PrivateContext, slot: Field) {
-        let encryption_pub_key = get_public_key(self.requester_address.address);
+    pub fn broadcast(self, context: &mut PrivateContext, slot: Field) {
+        let encryption_pub_key = get_public_key(self.requester_address);
 
         emit_encrypted_log(
             context,
@@ -117,8 +119,12 @@ fn compute_note_hash(note: QuestionNote) -> Field {
     note.compute_note_hash()
 }
 
-fn compute_nullifier(note: QuestionNote) -> Field {
-    note.compute_nullifier()
+fn compute_nullifier(note: QuestionNote, context: &mut PrivateContext) -> Field {
+    note.compute_nullifier(context)
+}
+
+fn compute_nullifier_without_context(note: QuestionNote) -> Field {
+    note.compute_nullifier_without_context()
 }
 
 fn get_header(note: QuestionNote) -> NoteHeader {
@@ -138,6 +144,7 @@ global QuestionNoteMethods = NoteInterface {
     serialize,
     compute_note_hash,
     compute_nullifier,
+    compute_nullifier_without_context,
     get_header,
     set_header,
     broadcast

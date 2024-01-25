@@ -17,10 +17,10 @@ import {
 
 import { createAccount, getInitialTestAccountsWallets } from "@aztec/accounts/testing"
 
-import { TokenContract } from "../../artifacts/Token.js";
+import { TokenContract } from "../../artifacts/token/Token.js";
 import { MockOracleCallbackContract } from "./MockCallback/interfaces/MockOracleCallback.js";
 
-import { PrivateOracleContract } from "../../artifacts/PrivateOracle.js";
+import { PrivateOracleContract } from "../../artifacts/oracle/PrivateOracle.js";
 import { AnswerNote, QuestionNote } from "../../../types/Notes.js";
 
 const PAYMENT_TOKEN_SLOT: Fr = new Fr(1);

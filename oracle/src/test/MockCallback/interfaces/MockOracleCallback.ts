@@ -82,22 +82,22 @@ export class MockOracleCallbackContract extends ContractBase {
   /** Type-safe wrappers for the public methods exposed by the contract. */
   public methods!: {
     
-    /** oracle_callback(answer: array, data: array, divinity: struct) */
-    oracle_callback: ((answer: FieldLike[], data: FieldLike[], divinity: AztecAddressLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
-
-    /** get_received_data() */
-    get_received_data: (() => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
+    /** deserialize_callback_data() */
+    deserialize_callback_data: (() => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 
     /** serialize_callback_data() */
     serialize_callback_data: (() => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 
-    /** deserialize_callback_data() */
-    deserialize_callback_data: (() => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
-
-    /** write_received_data(answer: array, data: array, divinity: struct) */
-    write_received_data: ((answer: FieldLike[], data: FieldLike[], divinity: AztecAddressLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
+    /** oracle_callback(answer: array, data: array, divinity: struct) */
+    oracle_callback: ((answer: FieldLike[], data: FieldLike[], divinity: AztecAddressLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 
     /** compute_note_hash_and_nullifier(contract_address: struct, nonce: field, storage_slot: field, serialized_note: array) */
     compute_note_hash_and_nullifier: ((contract_address: AztecAddressLike, nonce: FieldLike, storage_slot: FieldLike, serialized_note: FieldLike[]) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
+
+    /** get_received_data() */
+    get_received_data: (() => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
+
+    /** write_received_data(answer: array, data: array, divinity: struct) */
+    write_received_data: ((answer: FieldLike[], data: FieldLike[], divinity: AztecAddressLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
   };
 }

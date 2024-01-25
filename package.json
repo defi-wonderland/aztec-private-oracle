@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "compile": "aztec-nargo compile --workspace",
-    "codegen:nr": "aztec-cli codegen target/privateoracle-PrivateOracle.json -o src/artifacts --nr && aztec-cli codegen target/token_contract-Token.json -o src/artifacts --nr",
-    "codegen:ts": "aztec-cli codegen target/privateoracle-PrivateOracle.json -o src/artifacts --ts && aztec-cli codegen target/token_contract-Token.json -o src/artifacts --ts",
+    "codegen:nr": "aztec-cli codegen target/privateoracle-PrivateOracle.json -o oracle/artifacts/oracle --nr && aztec-cli codegen oracle/artifacts/Token.json -o oracle/artifacts/token --nr",
+    "codegen:ts": "aztec-cli codegen target/privateoracle-PrivateOracle.json -o oracle/artifacts/oracle --ts && aztec-cli codegen oracle/artifacts/Token.json -o oracle/artifacts/token --ts",
     "codegen:ts:mock": "aztec-cli codegen target/mock_oracle_callback-MockOracleCallback.json -o oracle/src/test/MockCallback/interfaces/ --ts",
     "codegen": "yarn codegen:nr && yarn codegen:ts && yarn codegen:ts:mock",
     "build:contracts": "yarn compile && yarn codegen",

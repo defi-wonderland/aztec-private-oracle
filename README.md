@@ -1,6 +1,9 @@
 # Aztec Private Oracle
 
-Aztec private oracle provides an oracle solution for those who want to keep their privacy. When asking something to a particular address (called divinity), the question and the answer is encrypted and only the requester and the divinity can read it, no other party has access to it. This allows for users to be able to ask anything they want and for the data to be priced more faily as current oracle systems publicly share their data feeds so everyone can read it for free instead of paying for every usage. 
+Aztec private oracle provides an oracle solution for those who want to keep their privacy. When asking something to a particular address (called divinity), the question and the answer is encrypted and only the requester and the divinity can read it, no other party has access to it. 
+
+Current oracle systems post their answers in the public blockchain so everyone can read it for free. As a result, there is no incentive for most data consumers to pay for the information. 
+The Aztec private oracle only shows the answer to the users who paid for it. This new paradigm effectively enables data subscription models over a blockchain.  
 
 You can check our design for the proof of concept on [Figma](https://www.figma.com/file/vf16Wx0M1ma995WEjcsx8s/Aztec-Private-Oracle?type=whiteboard&node-id=1-2&t=KjgSLbNpUGqQmsi4-4)
 
